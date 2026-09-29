@@ -2,7 +2,6 @@
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jmusial/comment-complexity/badge)](https://scorecard.dev/viewer/?uri=github.com/jmusial/comment-complexity)
 
-
 VS Code extension that scores how hard code comments are to read.
 
 > Early development. Scaffold only, no scoring yet.
