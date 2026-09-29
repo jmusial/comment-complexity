@@ -6,7 +6,15 @@
   "categories": [
     "Other"
   ],
+  "homepage": "https://github.com/jmusial/comment-complexity#readme",
+  "bugs": {
+    "url": "https://github.com/jmusial/comment-complexity/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jmusial/comment-complexity.git"
+  },
   "publisher": "jmusial",
   "main": "./dist/extension.js",
   "scripts": {
@@ -69,13 +77,5 @@
   "engines": {
     "vscode": "^1.138.0"
   },
-  "packageManager": "pnpm@12.6.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jmusial/comment-complexity.git"
-  },
-  "homepage": "https://github.com/jmusial/comment-complexity#readme",
-  "bugs": {
-    "url": "https://github.com/jmusial/comment-complexity/issues"
-  }
+  "packageManager": "pnpm@12.6.0"
 }
