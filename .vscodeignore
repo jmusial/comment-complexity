@@ -15,3 +15,9 @@ pnpm-workspace.yaml
 **/*.map
 **/*.ts
 **/.vscode-test.*
+pnpm-lock.yaml
+.github/**
+coverage/**
+renovate.json
+.gitattributes
+*.vsix

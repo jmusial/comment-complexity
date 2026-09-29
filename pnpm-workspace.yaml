@@ -1,4 +1,5 @@
 allowBuilds:
+  "@vscode/vsce-sign": true
   esbuild: true
 overrides:
   diff: ^8.0.4
