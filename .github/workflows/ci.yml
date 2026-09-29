@@ -13,62 +13,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: ${{ matrix.os }}
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+      - name: Format check
+        run: pnpm fmt:check
+      - name: Typecheck
+        run: pnpm check-types
+
+      - name: Package
+        run: pnpm package
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: "*.vsix"
+          if-no-files-found: error
+
+  test:
+    name: test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
-
       - run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Format check
-        run: pnpm fmt:check
-
-      - name: Typecheck
-        run: pnpm check-types
-
       - name: Unit tests
+        if: runner.os != 'Linux'
         run: pnpm test
+      - name: Unit tests (coverage)
+        if: runner.os == 'Linux'
+        run: pnpm test:coverage
+      - name: Upload coverage
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          files: coverage/lcov.info
+          fail_ci_if_error: true
 
       - name: Cache VS Code test binaries
         uses: actions/cache@v4
         with:
           path: .vscode-test
           key: vscode-test-${{ runner.os }}-${{ hashFiles('package.json') }}
-
       - name: Integration tests (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a pnpm test:integration
-
       - name: Integration tests
         if: runner.os != 'Linux'
         run: pnpm test:integration
-
-      - name: Package
-        run: pnpm package
-
-      - name: Upload VSIX
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: vsix
-          path: "*.vsix"
-          if-no-files-found: error
