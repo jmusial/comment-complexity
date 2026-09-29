@@ -1,0 +1,17 @@
+.vscode/**
+.vscode-test/**
+out/**
+node_modules/**
+src/**
+.gitignore
+.yarnrc
+esbuild.js
+.oxlintrc.json
+.oxfmtrc.json
+.npmrc
+vitest.config.mts
+pnpm-workspace.yaml
+**/tsconfig.json
+**/*.map
+**/*.ts
+**/.vscode-test.*
