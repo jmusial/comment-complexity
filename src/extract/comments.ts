@@ -11,9 +11,11 @@ export interface Comment {
   readonly rawText: string;
   /** Name of the declaration the comment documents, if any. */
   readonly targetSymbolName: string | undefined;
+  /** Found by the regex fallback: no syntax tree, so no target symbol or commented-out code check. */
+  readonly approx: boolean;
 }
 
-const LICENSE = /\b(?:copyright|licen[cs]ed?|spdx-license-identifier)\b|\(c\)|©/i;
+export const LICENSE = /\b(?:copyright|licen[cs]ed?|spdx-license-identifier)\b|\(c\)|©/i;
 
 /** Commented-out code nearly always has one of these; prose that happens to parse (`TODO`, `a - b`) does not. */
 const CODE_PUNCTUATION = /[;{}()[\]=]/;
@@ -62,6 +64,7 @@ export function extractComments(tree: Tree, spec: LanguageSpec): Comment[] {
         kind,
         rawText: nodes.map(textOf).join("\n"),
         targetSymbolName: inner ? enclosingName(first, spec) : targetOf(last, spec),
+        approx: false,
       });
     }
     return comments.toSorted(
@@ -220,6 +223,7 @@ function docstringsOf(tree: Tree, spec: LanguageSpec): Comment[] {
       kind: "doc",
       rawText: string.text,
       targetSymbolName: isModule ? undefined : nameOf(owner, spec),
+      approx: false,
     });
   }
   return comments;
