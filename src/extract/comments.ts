@@ -65,7 +65,8 @@ export function extractComments(tree: Tree, spec: LanguageSpec): Comment[] {
       });
     }
     return comments.toSorted(
-      (a, b) => a.range.start.row - b.range.start.row || a.range.start.column - b.range.start.column,
+      (a, b) =>
+        a.range.start.row - b.range.start.row || a.range.start.column - b.range.start.column,
     );
   } finally {
     parser?.delete();
