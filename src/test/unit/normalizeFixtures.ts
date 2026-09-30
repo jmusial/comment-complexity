@@ -1,0 +1,1051 @@
+import type { Dialect } from "../../normalize/clean";
+
+export interface Fixture {
+  readonly raw: string;
+  readonly text: string;
+  readonly identifiers: readonly string[];
+}
+
+/** Doc comments as they appear in real code, per dialect, with the prose each should become. */
+export const FIXTURES: Record<Dialect, readonly Fixture[]> = {
+  jsdoc: [
+    {
+      raw: [
+        "/**",
+        " * Returns the user with the given id, or `null` if none exists.",
+        " *",
+        " * @param {string} id - The user's unique id.",
+        " * @returns {Promise<User | null>} The user, if found.",
+        " */",
+      ].join("\n"),
+      text: [
+        "Returns the user with the given id, or null if none exists.",
+        "The user's unique id.",
+        "The user, if found.",
+      ].join("\n"),
+      identifiers: ["id", "null"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Parses the header block.",
+        " * <p>",
+        " * Uses {@link HeaderParser} internally; see {@link #reset()} for reuse.",
+        " *",
+        " * @param input the raw bytes",
+        " * @return the parsed {@code Header}",
+        " * @throws IOException if the stream ends early",
+        " * @since 2.1",
+        " */",
+      ].join("\n"),
+      text: [
+        "Parses the header block.",
+        "Uses header parser internally; see reset for reuse.",
+        "the raw bytes",
+        "the parsed header",
+        "if the stream ends early",
+      ].join("\n"),
+      identifiers: ["input", "IOException", "HeaderParser", "reset", "Header"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Debounces {@link Emitter.emit | emit calls} by `waitMs` milliseconds.",
+        " *",
+        " * @typeParam T - The event payload type.",
+        " * @example",
+        " * ```ts",
+        " * const d = debounce(fn, 100);",
+        " * ```",
+        " * @public",
+        " */",
+      ].join("\n"),
+      text: ["Debounces emit calls by wait ms milliseconds.", "The event payload type."].join("\n"),
+      identifiers: ["T", "waitMs"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Caches results of getUserById for MAX_AGE seconds.",
+        " * See https://example.com/docs/cache for details.",
+        " */",
+      ].join("\n"),
+      text: "Caches results of get user by id for max age seconds. See for details.",
+      identifiers: ["getUserById", "MAX_AGE"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Adds an item to the cart.",
+        " *",
+        " * @param string $sku  The product SKU.",
+        " * @param int    $qty  How many to add.",
+        " * @return void",
+        " */",
+      ].join("\n"),
+      text: ["Adds an item to the cart.", "The product SKU.", "How many to add."].join("\n"),
+      identifiers: ["$sku", "$qty"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Retries [block] up to [times] times with exponential backoff.",
+        " *",
+        " * @param times how many attempts to make",
+        " * @throws IllegalStateException when every attempt fails",
+        " */",
+      ].join("\n"),
+      text: [
+        "Retries block up to times times with exponential backoff.",
+        "how many attempts to make",
+        "when every attempt fails",
+      ].join("\n"),
+      identifiers: ["times", "IllegalStateException", "block"],
+    },
+    {
+      raw: [
+        "/**",
+        " * \\brief Computes the CRC-32 of a buffer.",
+        " * \\param[in] data Pointer to the bytes.",
+        " * \\param[in] len  Number of bytes.",
+        " * \\return The checksum.",
+        " */",
+      ].join("\n"),
+      text: [
+        "Computes the CRC-32 of a buffer.",
+        "Pointer to the bytes.",
+        "Number of bytes.",
+        "The checksum.",
+      ].join("\n"),
+      identifiers: ["data", "len"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Renders a paginated list of orders.",
+        " *",
+        " * @param {Object} props",
+        " * @param {Order[]} props.orders - Orders for the current page.",
+        " * @param {number} [props.pageSize=20] - How many rows to show.",
+        " */",
+      ].join("\n"),
+      text: [
+        "Renders a paginated list of orders.",
+        "Orders for the current page.",
+        "How many rows to show.",
+      ].join("\n"),
+      identifiers: ["props", "props.orders", "props.pageSize"],
+    },
+    {
+      raw: [
+        "/**",
+        " * @deprecated Use {@link createStore} instead; this will be removed in v3.",
+        " * @see https://example.com/migration",
+        " */",
+      ].join("\n"),
+      text: "Use create store instead; this will be removed in v3.",
+      identifiers: ["createStore"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Merges two sorted arrays into one.",
+        " *",
+        " * @remarks",
+        " * Runs in linear time. Both inputs must already be sorted",
+        " * with the same comparator.",
+        " *",
+        " * @returns A new array; the inputs are not modified.",
+        " */",
+      ].join("\n"),
+      text: [
+        "Merges two sorted arrays into one.",
+        "Runs in linear time. Both inputs must already be sorted with the same comparator.",
+        "A new array; the inputs are not modified.",
+      ].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/**",
+        " * Thread-safe registry of event handlers.",
+        " *",
+        " * <p>Handlers are invoked in registration order. Supported events:",
+        " * <ul>",
+        " *   <li>{@code START} when the service boots</li>",
+        " *   <li>{@code STOP} before shutdown</li>",
+        " * </ul>",
+        " *",
+        " * @author Jane Doe",
+        " * @param <E> the event type",
+        " */",
+      ].join("\n"),
+      text: [
+        "Thread-safe registry of event handlers.",
+        "Handlers are invoked in registration order. Supported events:",
+        "start when the service boots",
+        "stop before shutdown",
+        "the event type",
+      ].join("\n"),
+      identifiers: ["E", "START", "STOP"],
+    },
+    {
+      raw: [
+        "/**",
+        " * A rolling window of the last [capacity] samples.",
+        " *",
+        " * @property capacity maximum number of samples kept",
+        " * @constructor Creates an empty window.",
+        " */",
+      ].join("\n"),
+      text: [
+        "A rolling window of the last capacity samples.",
+        "maximum number of samples kept",
+        "Creates an empty window.",
+      ].join("\n"),
+      identifiers: ["capacity"],
+    },
+    {
+      raw: [
+        "/**",
+        " * Loads a customer by email address.",
+        " *",
+        " * @param string $email Lower-cased address.",
+        " * @return Customer|null The customer, or null when not found.",
+        " * @throws \\InvalidArgumentException If the address is malformed.",
+        " */",
+      ].join("\n"),
+      text: [
+        "Loads a customer by email address.",
+        "Lower-cased address.",
+        "The customer, or null when not found.",
+        "If the address is malformed.",
+      ].join("\n"),
+      identifiers: ["$email", "\\InvalidArgumentException"],
+    },
+    {
+      raw: [
+        "/**",
+        " * @brief Owns a pool of worker threads.",
+        " *",
+        " * @note Not copyable; move it instead.",
+        " * @warning Destroying the pool blocks until every task finishes.",
+        " */",
+      ].join("\n"),
+      text: [
+        "Owns a pool of worker threads.",
+        "Not copyable; move it instead.",
+        "Destroying the pool blocks until every task finishes.",
+      ].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/// Returns the index of @p value in the sorted range, or -1.",
+        "/// @param first Start of the range.",
+        "/// @param last  One past the end.",
+      ].join("\n"),
+      text: [
+        "Returns the index of value in the sorted range, or -1.",
+        "Start of the range.",
+        "One past the end.",
+      ].join("\n"),
+      identifiers: ["first", "last", "value"],
+    },
+    {
+      raw: [
+        "/**",
+        " * @fileoverview Helpers for parsing CSV exports from the billing system.",
+        " * @module billing/csv",
+        " */",
+      ].join("\n"),
+      text: "Helpers for parsing CSV exports from the billing system.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/**",
+        " * {@inheritDoc Base.render}",
+        " *",
+        " * Escapes &lt; and &gt; before writing to the DOM.",
+        " */",
+      ].join("\n"),
+      text: "Escapes < and > before writing to the DOM.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/**",
+        " * Builds a request with sensible defaults.",
+        " * <pre>{@code",
+        " * Request r = Request.builder().timeout(5).build();",
+        " * }</pre>",
+        " * @return a new builder",
+        " */",
+      ].join("\n"),
+      text: ["Builds a request with sensible defaults.", "a new builder"].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/**",
+        " * Walks the tree depth-first.",
+        " * @generator",
+        " * @yields {Node} Each visited node, parents before children.",
+        " */",
+      ].join("\n"),
+      text: ["Walks the tree depth-first.", "Each visited node, parents before children."].join(
+        "\n",
+      ),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/**",
+        " * Signs the payload with HMAC-SHA256, as described in",
+        " * [RFC 2104](https://www.rfc-editor.org/rfc/rfc2104).",
+        " *",
+        " * @param secret The shared key.",
+        " * @param payload Raw bytes to sign.",
+        " */",
+      ].join("\n"),
+      text: [
+        "Signs the payload with HMAC-SHA256, as described in RFC 2104.",
+        "The shared key.",
+        "Raw bytes to sign.",
+      ].join("\n"),
+      identifiers: ["secret", "payload"],
+    },
+    {
+      // Stripping "<b>" leaves "<i>", which a second pass removes.
+      raw: "/** Keeps <<b>i>bold text. */",
+      text: "Keeps bold text.",
+      identifiers: [],
+    },
+    {
+      // The full stop ends the sentence, not the name.
+      raw: "/** Returns @p value. */",
+      text: "Returns value.",
+      identifiers: ["value"],
+    },
+  ],
+  markdown: [
+    {
+      raw: [
+        "/// Returns the number of elements in the vector.",
+        "///",
+        "/// # Examples",
+        "///",
+        "/// ```",
+        "/// let v = vec![1, 2, 3];",
+        "/// assert_eq!(v.len(), 3);",
+        "/// ```",
+      ].join("\n"),
+      text: "Returns the number of elements in the vector.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/// Converts a [`Path`] into an owned [`PathBuf`].",
+        "///",
+        "/// See [std::fs::canonicalize] and the [module docs](crate::fs) for details.",
+      ].join("\n"),
+      text: [
+        "Converts a path into an owned path buf.",
+        "See std fs canonicalize and the module docs for details.",
+      ].join("\n"),
+      identifiers: ["Path", "PathBuf", "std::fs::canonicalize"],
+    },
+    {
+      raw: [
+        "//! A **fast** JSON parser.",
+        "//!",
+        "//! Based on <https://www.json.org/json-en.html>; handles *most* inputs.",
+      ].join("\n"),
+      text: ["A fast JSON parser.", "Based on; handles most inputs."].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/// Reads a value without bounds checks.",
+        "///",
+        "/// # Safety",
+        "///",
+        "/// - `index` must be less than `self.len()`.",
+        "/// - The buffer must be initialized.",
+      ].join("\n"),
+      text: [
+        "Reads a value without bounds checks.",
+        "index must be less than self len.",
+        "The buffer must be initialized.",
+      ].join("\n"),
+      identifiers: ["index", "self.len"],
+    },
+    {
+      raw: "/// Panics if `capacity` exceeds [`isize::MAX`] bytes.",
+      text: "Panics if capacity exceeds isize max bytes.",
+      identifiers: ["isize::MAX", "capacity"],
+    },
+    {
+      raw: [
+        "/// # Errors",
+        "///",
+        "/// Returns [`io::Error`] if the file cannot be opened, and",
+        "/// [`ParseError`](crate::ParseError) if a line is malformed.",
+      ].join("\n"),
+      text: "Returns io error if the file cannot be opened, and parse error if a line is malformed.",
+      identifiers: ["io::Error", "ParseError"],
+    },
+    {
+      raw: "/// Maximum number of idle connections kept per host; `0` disables pooling.",
+      text: "Maximum number of idle connections kept per host; 0 disables pooling.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/// Steps performed on startup:",
+        "///",
+        "/// 1. Load the config file.",
+        "/// 2. Open the database pool.",
+        "/// 3. Start the HTTP listener.",
+        "///",
+        "/// **Note:** steps run sequentially.",
+      ].join("\n"),
+      text: [
+        "Steps performed on startup:",
+        "Load the config file.",
+        "Open the database pool.",
+        "Start the HTTP listener.",
+        "Note: steps run sequentially.",
+      ].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "//! > This crate is experimental.",
+        "//!",
+        "//! See the [guide][book] for an overview.",
+        "//!",
+        "//! [book]: https://example.com/book",
+      ].join("\n"),
+      text: ["This crate is experimental.", "See the guide for an overview."].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/// Converts bytes to a `&str` without checking UTF-8.",
+        "///",
+        "/// ~~~ignore",
+        '/// let s = unsafe { from_utf8_unchecked(b"hi") };',
+        "/// ~~~",
+      ].join("\n"),
+      text: "Converts bytes to a str without checking UTF-8.",
+      identifiers: ["str"],
+    },
+    {
+      raw: "/// Returns [`Some`] with the cached value, or [`None`] after `ttl` expires.",
+      text: "Returns some with the cached value, or none after ttl expires.",
+      identifiers: ["Some", "None", "ttl"],
+    },
+    {
+      raw: "/// Retries the request <b>at most</b> three times.",
+      text: "Retries the request at most three times.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/// Example of a doc snippet:",
+        "///",
+        "/// ```text",
+        "/// ```ts",
+        "/// let leaked = 1;",
+        "/// ```",
+        "/// Done.",
+      ].join("\n"),
+      // "```ts" cannot close a "```" fence, so the code stays inside it.
+      text: ["Example of a doc snippet:", "Done."].join("\n"),
+      identifiers: [],
+    },
+    {
+      // A definition's title on the next line is part of the definition.
+      raw: [
+        "/// See [guide][book].",
+        "///",
+        "/// [book]: https://example.com",
+        '///   "Reference title"',
+      ].join("\n"),
+      text: "See guide.",
+      identifiers: [],
+    },
+    {
+      // Destination on its own line, then a title spanning two lines.
+      raw: [
+        "/// Read the [spec][cm] first.",
+        "///",
+        "/// [cm]:",
+        "///   https://spec.commonmark.org",
+        "///   'CommonMark",
+        "///   spec'",
+        "///",
+        "/// Then the tests.",
+      ].join("\n"),
+      text: ["Read the spec first.", "Then the tests."].join("\n"),
+      identifiers: [],
+    },
+    {
+      // The title is complete on the definition line, so the next line is prose again.
+      raw: ['/// [book]: https://example.com "Guide"', '/// "Quoted" advice stays.'].join("\n"),
+      text: '"Quoted" advice stays.',
+      identifiers: [],
+    },
+    {
+      // The title opens on the definition line and closes on the next.
+      raw: ["/// [book]: https://example.com 'Long", "/// title'", "/// Prose after."].join("\n"),
+      text: "Prose after.",
+      identifiers: [],
+    },
+  ],
+  python: [
+    {
+      raw: [
+        '"""Fetch rows from the table.',
+        "",
+        "    Args:",
+        "        table_name (str): Name of the table to read.",
+        "        limit: Maximum number of rows.",
+        "",
+        "    Returns:",
+        "        list[dict]: The rows, newest first.",
+        "",
+        "    Raises:",
+        "        KeyError: If the table does not exist.",
+        '    """',
+      ].join("\n"),
+      text: [
+        "Fetch rows from the table.",
+        "Name of the table to read.",
+        "Maximum number of rows.",
+        "The rows, newest first.",
+        "If the table does not exist.",
+      ].join("\n"),
+      identifiers: ["table_name", "limit", "KeyError"],
+    },
+    {
+      raw: [
+        '"""Open a connection to :class:`~db.Pool`.',
+        "",
+        ":param str dsn: Connection string such as ``postgres://host/db``.",
+        ":param timeout: Seconds to wait.",
+        ":type timeout: float",
+        ":returns: A live :class:`Connection`.",
+        ":rtype: Connection",
+        ":raises ConnectionError: When the server is unreachable.",
+        '"""',
+      ].join("\n"),
+      text: [
+        "Open a connection to pool.",
+        "Connection string such as.",
+        "Seconds to wait.",
+        "A live connection.",
+        "When the server is unreachable.",
+      ].join("\n"),
+      identifiers: ["dsn", "timeout", "ConnectionError", "Pool", "Connection"],
+    },
+    {
+      raw: [
+        '"""',
+        "    Resample the series to a new frequency.",
+        "",
+        "    Parameters",
+        "    ----------",
+        "    rule : str",
+        '        Target frequency, like ``"1H"``.',
+        "    how, fill : str, optional",
+        "        Aggregation and fill methods.",
+        "",
+        "    Returns",
+        "    -------",
+        "    Series",
+        "        The resampled data.",
+        "",
+        "    Examples",
+        "    --------",
+        '    >>> s.resample("1H")',
+        '    """',
+      ].join("\n"),
+      text: [
+        "Resample the series to a new frequency.",
+        "Target frequency, like.",
+        "Aggregation and fill methods.",
+        "The resampled data.",
+      ].join("\n"),
+      identifiers: ["rule", "how", "fill"],
+    },
+    {
+      raw: ["'''Return the square of x.", "", "    >>> square(3)", "    9", "    '''"].join("\n"),
+      text: "Return the square of x.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        '"""Iterate over pages of results.',
+        "",
+        "    Yields:",
+        "        dict: One page, with ``items`` and ``next`` keys.",
+        "",
+        "    Note:",
+        "        Stops when the API returns an empty page.",
+        '    """',
+      ].join("\n"),
+      text: [
+        "Iterate over pages of results.",
+        "One page, with items and next keys.",
+        "Stops when the API returns an empty page.",
+      ].join("\n"),
+      identifiers: ["items", "next"],
+    },
+    {
+      raw: [
+        '"""Upload a file to the bucket.',
+        "",
+        ":param path: Local path of the file.",
+        ":param key: Object key; defaults to the file name",
+        "    when omitted.",
+        ":return: The public URL of the object.",
+        ":raises PermissionError: If the bucket is read-only.",
+        '"""',
+      ].join("\n"),
+      text: [
+        "Upload a file to the bucket.",
+        "Local path of the file.",
+        "Object key; defaults to the file name when omitted.",
+        "The public URL of the object.",
+        "If the bucket is read-only.",
+      ].join("\n"),
+      identifiers: ["path", "key", "PermissionError"],
+    },
+    {
+      raw: [
+        '"""A bounded LRU cache.',
+        "",
+        "    Attributes:",
+        "        maxsize: Most entries kept before evicting.",
+        "        hits (int): Lookups served from the cache.",
+        '    """',
+      ].join("\n"),
+      text: [
+        "A bounded LRU cache.",
+        "Most entries kept before evicting.",
+        "Lookups served from the cache.",
+      ].join("\n"),
+      identifiers: ["maxsize", "hits"],
+    },
+    {
+      raw: '"""Return the :func:`hash` of ``user_id`` modulo ``shard_count``."""',
+      text: "Return the hash of user id modulo shard count.",
+      identifiers: ["hash", "user_id", "shard_count"],
+    },
+    {
+      raw: [
+        '"""',
+        "    Compute the weighted mean.",
+        "",
+        "    Parameters",
+        "    ----------",
+        "    values : array_like",
+        "        Input values.",
+        "    weights : array_like, optional",
+        "        Same shape as `values`.",
+        "",
+        "    Raises",
+        "    ------",
+        "    ValueError",
+        "        If the shapes differ.",
+        "",
+        "    See Also",
+        "    --------",
+        "    numpy.average : Equivalent NumPy function.",
+        '    """',
+      ].join("\n"),
+      text: [
+        "Compute the weighted mean.",
+        "Input values.",
+        "Same shape as values.",
+        "If the shapes differ.",
+      ].join("\n"),
+      identifiers: ["values", "weights", "ValueError"],
+    },
+    {
+      raw: [
+        '"""Utilities for the billing export.',
+        "",
+        "- Parses CSV rows into ``Invoice`` objects.",
+        "- Uploads results to S3 (see https://docs.aws.amazon.com/s3/).",
+        '"""',
+      ].join("\n"),
+      text: [
+        "Utilities for the billing export.",
+        "Parses CSV rows into invoice objects.",
+        "Uploads results to S3 (see).",
+      ].join("\n"),
+      identifiers: ["Invoice"],
+    },
+    {
+      raw: [
+        '"""Call the hook with the given arguments.',
+        "",
+        "    Args:",
+        "        *args: Positional arguments passed through.",
+        "        **kwargs: Keyword arguments; ``timeout`` is",
+        "            consumed here.",
+        '    """',
+      ].join("\n"),
+      text: [
+        "Call the hook with the given arguments.",
+        "Positional arguments passed through.",
+        "Keyword arguments; timeout is consumed here.",
+      ].join("\n"),
+      identifiers: ["args", "kwargs", "timeout"],
+    },
+    {
+      raw: [
+        'r"""Match semantic version tags such as ``v2``.',
+        "",
+        "    The pattern is anchored at the start.",
+        '    """',
+      ].join("\n"),
+      text: [
+        "Match semantic version tags such as v2.",
+        "The pattern is anchored at the start.",
+      ].join("\n"),
+      identifiers: ["v2"],
+    },
+    {
+      raw: [
+        '"""Session state for one client.',
+        "",
+        ":ivar token: Bearer token; refreshed by :meth:`the refresh hook <Session.refresh>`.",
+        ":vartype token: str",
+        '"""',
+      ].join("\n"),
+      text: ["Session state for one client.", "Bearer token; refreshed by the refresh hook."].join(
+        "\n",
+      ),
+      identifiers: ["token"],
+    },
+    {
+      raw: [
+        '"""Delete every row in the table.',
+        "",
+        "    Warning:",
+        "        This cannot be undone.",
+        "",
+        "    Example:",
+        '        >>> truncate("events")',
+        '    """',
+      ].join("\n"),
+      text: ["Delete every row in the table.", "This cannot be undone."].join("\n"),
+      identifiers: [],
+    },
+  ],
+  xmldoc: [
+    {
+      raw: [
+        "/// <summary>",
+        '/// Gets the <see cref="T:Shop.Order"/> with the given <paramref name="orderId"/>.',
+        "/// </summary>",
+        '/// <param name="orderId">The order\'s database id.</param>',
+        '/// <returns>The order, or <see langword="null"/> when missing.</returns>',
+        '/// <exception cref="System.ArgumentException">Thrown when <c>orderId</c> is negative.</exception>',
+      ].join("\n"),
+      text: [
+        "Gets the shop order with the given order id.",
+        "The order's database id.",
+        "The order, or null when missing.",
+        "Thrown when order id is negative.",
+      ].join("\n"),
+      identifiers: ["Shop.Order", "orderId", "System.ArgumentException"],
+    },
+    {
+      raw: [
+        "/// <summary>Formats the total for display.</summary>",
+        "/// <remarks>",
+        "/// <para>Uses the current culture.</para>",
+        "/// <example>",
+        "/// <code>var s = FormatTotal(order);</code>",
+        "/// </example>",
+        "/// </remarks>",
+      ].join("\n"),
+      text: ["Formats the total for display.", "Uses the current culture."].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        '/// <summary>A cache keyed by <typeparamref name="TKey"/>. See <see href="https://example.com">the guide</see>.</summary>',
+        '/// <typeparam name="TKey">The key type.</typeparam>',
+      ].join("\n"),
+      text: ["A cache keyed by t key. See the guide.", "The key type."].join("\n"),
+      identifiers: ["TKey"],
+    },
+    {
+      raw: [
+        "/// <summary>Gets or sets the retry limit.</summary>",
+        "/// <value>A non-negative count; <c>0</c> disables retries.</value>",
+      ].join("\n"),
+      text: ["Gets or sets the retry limit.", "A non-negative count; 0 disables retries."].join(
+        "\n",
+      ),
+      identifiers: [],
+    },
+    {
+      raw: [
+        "/// <summary>",
+        "/// Validates the order. Checks:",
+        '/// <list type="bullet">',
+        "/// <item><description>the total is positive;</description></item>",
+        "/// <item><description>every line has a SKU.</description></item>",
+        "/// </list>",
+        "/// </summary>",
+      ].join("\n"),
+      text: [
+        "Validates the order. Checks:",
+        "the total is positive;",
+        "every line has a SKU.",
+      ].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: [
+        '/// <inheritdoc cref="IRepository{T}.Save"/>',
+        '/// <remarks>Also flushes the <see cref="M:Shop.Db.Flush(System.Boolean)"/> buffer.</remarks>',
+      ].join("\n"),
+      text: "Also flushes the shop db flush buffer.",
+      identifiers: ["Shop.Db.Flush"],
+    },
+    {
+      raw: [
+        '/// <summary>Wraps a <see cref="List{T}"/> with change notifications.</summary>',
+        '/// <typeparam name="T">The item type.</typeparam>',
+        '/// <exception cref="T:System.InvalidOperationException">Thrown when modified during enumeration.</exception>',
+      ].join("\n"),
+      text: [
+        "Wraps a list with change notifications.",
+        "The item type.",
+        "Thrown when modified during enumeration.",
+      ].join("\n"),
+      identifiers: ["List", "T", "System.InvalidOperationException"],
+    },
+    {
+      raw: [
+        "/// <summary>Sends the message asynchronously.</summary>",
+        '/// <param name="ct">Cancels the send.</param>',
+        '/// <returns>A task that completes when the broker acknowledges; <see langword="true"/> if delivered.</returns>',
+      ].join("\n"),
+      text: [
+        "Sends the message asynchronously.",
+        "Cancels the send.",
+        "A task that completes when the broker acknowledges; true if delivered.",
+      ].join("\n"),
+      identifiers: ["ct"],
+    },
+    {
+      raw: [
+        "/// <summary>Parses ISO 8601 timestamps.</summary>",
+        "/// <remarks>",
+        "/// <para>Offsets are required.</para>",
+        '/// <para>See <seealso href="https://www.iso.org/iso-8601-date-and-time-format.html"/> for the format.</para>',
+        "/// </remarks>",
+      ].join("\n"),
+      text: ["Parses ISO 8601 timestamps.", "Offsets are required.", "See for the format."].join(
+        "\n",
+      ),
+      identifiers: [],
+    },
+    {
+      raw: '/// <summary>Scales <paramref name="value"/> by <b>factor</b>, clamped to <c>MaxValue</c>.</summary>',
+      text: "Scales value by factor, clamped to max value.",
+      identifiers: ["value", "MaxValue"],
+    },
+  ],
+  godoc: [
+    {
+      raw: [
+        '// ParseDuration parses a duration string such as "300ms" or "2h45m".',
+        "// Units are case-sensitive; see [time.Duration] for the range.",
+        "//",
+        "// Example:",
+        "//",
+        '//\td, err := ParseDuration("1h15m")',
+        "//\tif err != nil {",
+        "//\t\tlog.Fatal(err)",
+        "//\t}",
+      ].join("\n"),
+      text: [
+        'parse duration parses a duration string such as "300ms" or "2h45m". Units are case-sensitive; see time duration for the range.',
+        "Example:",
+      ].join("\n"),
+      identifiers: ["time.Duration", "ParseDuration"],
+    },
+    {
+      raw: "// Deprecated: Use [NewClient] instead.",
+      text: "Deprecated: Use new client instead.",
+      identifiers: ["NewClient"],
+    },
+    {
+      raw: [
+        "// Options control retries:",
+        "//   - MaxRetries caps attempts (see https://go.dev/issue/1234).",
+        "//   - Backoff sets the delay.",
+      ].join("\n"),
+      text: [
+        "Options control retries:",
+        "max retries caps attempts (see).",
+        "Backoff sets the delay.",
+      ].join("\n"),
+      identifiers: ["MaxRetries"],
+    },
+    {
+      raw: [
+        "// Package ratelimit implements a token-bucket limiter.",
+        "//",
+        "// # Usage",
+        "//",
+        "// Create a [Limiter] with [New] and call [Limiter.Wait] before each request.",
+      ].join("\n"),
+      text: [
+        "Package ratelimit implements a token-bucket limiter.",
+        "Create a limiter with new and call limiter wait before each request.",
+      ].join("\n"),
+      identifiers: ["Limiter", "New", "Limiter.Wait"],
+    },
+    {
+      raw: "// MaxIdle is the maximum number of idle connections; zero means DefaultMaxIdle.",
+      text: "max idle is the maximum number of idle connections; zero means default max idle.",
+      identifiers: ["MaxIdle", "DefaultMaxIdle"],
+    },
+    {
+      raw: [
+        "// Close releases the file handle. It returns an error wrapping [fs.ErrClosed]",
+        "// if the handle was already closed.",
+      ].join("\n"),
+      text: "Close releases the file handle. It returns an error wrapping fs err closed if the handle was already closed.",
+      identifiers: ["fs.ErrClosed"],
+    },
+    {
+      raw: [
+        "// Migrate applies pending migrations in order:",
+        "//  1. Lock the schema table.",
+        "//  2. Apply each migration in a transaction.",
+        "//",
+        "// For example:",
+        "//",
+        "//\terr := Migrate(ctx, db)",
+      ].join("\n"),
+      text: [
+        "Migrate applies pending migrations in order:",
+        "Lock the schema table.",
+        "Apply each migration in a transaction.",
+        "For example:",
+      ].join("\n"),
+      identifiers: [],
+    },
+    {
+      raw: "// Deprecated: The v1 API is shut down; see https://example.com/v2 for the replacement.",
+      text: "Deprecated: The v1 API is shut down; see for the replacement.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        "// Supported formats:",
+        "//   - JSON (default)",
+        "//   - YAML, when built with the yaml tag",
+      ].join("\n"),
+      text: ["Supported formats:", "JSON (default)", "YAML, when built with the yaml tag"].join(
+        "\n",
+      ),
+      identifiers: [],
+    },
+    {
+      raw: "// String implements [fmt.Stringer]. The result looks like `Addr.String`.",
+      text: "String implements fmt stringer. The result looks like addr string.",
+      identifiers: ["fmt.Stringer", "Addr.String"],
+    },
+  ],
+  plain: [
+    {
+      raw: "// TODO(jan): handle the retryCount overflow case",
+      text: "TODO(jan): handle the retry count overflow case",
+      identifiers: ["retryCount"],
+    },
+    {
+      raw: [
+        "# Keep in sync with `settings.MAX_WORKERS`.",
+        "# Values above 64 thrash the scheduler.",
+      ].join("\n"),
+      text: "Keep in sync with settings max workers. Values above 64 thrash the scheduler.",
+      identifiers: ["settings.MAX_WORKERS"],
+    },
+    {
+      raw: "/* Fall back to the slow path when the cache is cold. */",
+      text: "Fall back to the slow path when the cache is cold.",
+      identifiers: [],
+    },
+    {
+      raw: "-- see http://lua.org for details",
+      text: "see for details",
+      identifiers: [],
+    },
+    {
+      raw: "<!-- Hero banner: keep the h1 first for SEO -->",
+      text: "Hero banner: keep the h1 first for SEO",
+      identifiers: [],
+    },
+    {
+      raw: "// Cache hits for Dictionary<string, int> lookups are cheap.",
+      text: "Cache hits for Dictionary<string, int> lookups are cheap.",
+      identifiers: [],
+    },
+    {
+      raw: [
+        "=begin",
+        "Legacy importer kept for the 2019 archive.",
+        "Remove after the migration.",
+        "=end",
+      ].join("\n"),
+      text: "Legacy importer kept for the 2019 archive. Remove after the migration.",
+      identifiers: [],
+    },
+    {
+      raw: ["-- Soft-deleted rows keep deleted_at set;", "-- exclude them from every report."].join(
+        "\n",
+      ),
+      text: "Soft-deleted rows keep deleted at set; exclude them from every report.",
+      identifiers: ["deleted_at"],
+    },
+    {
+      raw: "// **Do not** reorder: keys are hashed in order.",
+      text: "Do not reorder: keys are hashed in order.",
+      identifiers: [],
+    },
+    {
+      raw: "{- Strict fold avoids the thunk build-up of foldl. -}",
+      text: "Strict fold avoids the thunk build-up of foldl.",
+      identifiers: [],
+    },
+    {
+      raw: "# Workaround for https://bugs.python.org/issue12345 (fixed in 3.12).",
+      text: "Workaround for (fixed in 3.12).",
+      identifiers: [],
+    },
+    {
+      raw: "// Must run before Registry::instance() is first called.",
+      text: "Must run before registry instance is first called.",
+      identifiers: ["Registry::instance"],
+    },
+    {
+      raw: "--[[ Called once per frame; keep it allocation-free. ]]",
+      text: "Called once per frame; keep it allocation-free.",
+      identifiers: [],
+    },
+  ],
+};
