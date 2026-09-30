@@ -191,7 +191,17 @@ function units(lines: string[]): string[] {
     const reference = DEFINITION.exec(line);
     if (reference) {
       flush();
-      definition = reference[1] === undefined ? "destination" : "title";
+      const rest = line.slice(reference[0].length).trim();
+      const close = TITLE_CLOSE[rest[0] ?? ""];
+      if (reference[1] === undefined) {
+        definition = "destination";
+      } else if (close === undefined) {
+        // No title yet; one may follow on the next line.
+        definition = "title";
+      } else if (rest.length === 1 || !rest.endsWith(close)) {
+        // The title opens here and continues on later lines.
+        titleClose = close;
+      }
       continue;
     }
     if (line === "" || /^#{1,6}\s/.test(line)) {

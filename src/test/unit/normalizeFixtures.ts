@@ -492,6 +492,18 @@ export const FIXTURES: Record<Dialect, readonly Fixture[]> = {
       text: ["Read the spec first.", "Then the tests."].join("\n"),
       identifiers: [],
     },
+    {
+      // The title is complete on the definition line, so the next line is prose again.
+      raw: ['/// [book]: https://example.com "Guide"', '/// "Quoted" advice stays.'].join("\n"),
+      text: '"Quoted" advice stays.',
+      identifiers: [],
+    },
+    {
+      // The title opens on the definition line and closes on the next.
+      raw: ["/// [book]: https://example.com 'Long", "/// title'", "/// Prose after."].join("\n"),
+      text: "Prose after.",
+      identifiers: [],
+    },
   ],
   python: [
     {
