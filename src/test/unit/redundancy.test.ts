@@ -16,6 +16,12 @@ describe("redundancy", () => {
     ["Processes the batches.", "processBatches", true, 1],
     // "status" is not a plural of "statu".
     ["Returns the status.", "getStatus", true, 1],
+    // -ing and -ed drop a silent e; the synonym must still be found.
+    ["Retrieving the user.", "getUser", true, 1],
+    ["Updating the timeout.", "setTimeout", true, 1],
+    ["Removed the entry.", "deleteEntry", true, 1],
+    // Exactly at the threshold.
+    ["user user user cache", "getUser", true, 0.75],
     // Descriptive: most of the words add something the name does not say.
     [
       "Gets the user from the cache, falling back to the database on a miss.",
@@ -32,6 +38,12 @@ describe("redundancy", () => {
     ["Gets the user", undefined, false, 0],
   ])("%j above %s → %s", (text, symbol, redundant, overlap) => {
     expect(redundancy(text, symbol)).toMatchObject({ redundant, overlap });
+  });
+
+  it("compares the exact share with the threshold, not the rounded one", () => {
+    // 38 of 51 words is 0.745: shown as 0.75, but below the threshold.
+    const text = [...Array<string>(38).fill("user"), ...Array<string>(13).fill("cache")].join(" ");
+    expect(redundancy(text, "getUser")).toEqual({ redundant: false, overlap: 0.75 });
   });
 
   it("names the symbol in the reason", () => {

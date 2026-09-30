@@ -107,7 +107,8 @@ function stem(word: string): string {
     // "getting" → "gett" → "get".
     stemmed = suffix[1]!.replace(/([^aeiou])\1$/, "$1");
   }
-  return CANONICAL.get(stemmed) ?? stemmed;
+  // Stripping -ing or -ed also drops a silent e: "retrieving" → "retriev", which is "retrieve".
+  return CANONICAL.get(stemmed) ?? CANONICAL.get(`${stemmed}e`) ?? stemmed;
 }
 
 /** Same stem, or one a short extension of the other ("pars" from "parsed" and "parse"). */
@@ -140,8 +141,10 @@ export function redundancy(text: string, symbolName: string | undefined): Redund
   }
   const symbol = splitIdentifier(symbolName).split(" ").map(stem);
   const restated = comment.filter((word) => symbol.some((part) => sameWord(word, part))).length;
-  const overlap = Math.round((restated / comment.length) * 100) / 100;
-  return overlap >= REDUNDANCY_THRESHOLD
+  const ratio = restated / comment.length;
+  // Rounded for display only, so 0.745 is not flagged as 0.75.
+  const overlap = Math.round(ratio * 100) / 100;
+  return ratio >= REDUNDANCY_THRESHOLD
     ? { redundant: true, overlap, reason: `Restates the name "${symbolName}"` }
     : { redundant: false, overlap };
 }
