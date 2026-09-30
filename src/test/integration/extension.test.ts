@@ -49,4 +49,19 @@ suite("Extension", () => {
     );
     assert.strictEqual(comment.text, "/** The answer. */");
   });
+
+  test("builds the vocabulary from workspace identifiers, skipping vendored code", async () => {
+    const { vocabulary } = await activate();
+    const words = await vocabulary.words();
+
+    for (const word of ["ledger", "entry", "settle", "invoice", "ttl", "seconds"]) {
+      assert.ok(words.has(word), `missing "${word}"`);
+    }
+    // Docstrings, comments and vendor/ are not the project's identifiers.
+    for (const word of ["docstrings", "comments", "zanzibar"]) {
+      assert.ok(!words.has(word), `unexpected "${word}"`);
+    }
+    // Built once, then cached.
+    assert.strictEqual(await vocabulary.words(), words);
+  });
 });
