@@ -3,16 +3,9 @@ import { type Edit, Language, Parser, type Point, type Tree } from "@vscode/tree
 import { LANGUAGES } from "./languages";
 
 /** VS Code language id to grammar file stem (`tree-sitter-<stem>.wasm`). */
-const GRAMMARS = new Map<string, string>([
-  ...[...LANGUAGES].map(([id, spec]) => [id, spec.grammar] as const),
-  // Parsed but not extracted yet; each moves into LANGUAGES once it has comment rules.
-  ["csharp", "c-sharp"],
-  ["cpp", "cpp"],
-  ["css", "css"],
-  ["php", "php"],
-  ["ruby", "ruby"],
-  ["shellscript", "bash"],
-]);
+const GRAMMARS = new Map<string, string>(
+  [...LANGUAGES].map(([id, spec]) => [id, spec.grammar] as const),
+);
 
 // The WASM runtime is process-global: re-running `Parser.init` would invalidate already loaded languages.
 let runtime: Promise<void> | undefined;
