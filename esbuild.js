@@ -6,9 +6,29 @@ const watch = process.argv.includes("--watch");
 const fs = require("node:fs");
 const path = require("node:path");
 
-// WASM files copied next to the bundle. The tree-sitter runtime and grammars land here in #3.
+// WASM files copied next to the bundle: tree-sitter runtime + grammars (loaded lazily at runtime).
+const wasmDir = "node_modules/@vscode/tree-sitter-wasm/wasm";
+const grammars = [
+  "bash",
+  "c-sharp",
+  "cpp",
+  "css",
+  "go",
+  "java",
+  "javascript",
+  "php",
+  "python",
+  "ruby",
+  "rust",
+  "tsx",
+  "typescript",
+];
 const wasmAssets = [
-  // { from: "node_modules/web-tree-sitter/tree-sitter.wasm", to: "dist/tree-sitter.wasm" },
+  { from: `${wasmDir}/tree-sitter.wasm`, to: "dist/tree-sitter.wasm" },
+  ...grammars.map((g) => ({
+    from: `${wasmDir}/tree-sitter-${g}.wasm`,
+    to: `dist/grammars/tree-sitter-${g}.wasm`,
+  })),
 ];
 
 /** @type {import('esbuild').Plugin} */
