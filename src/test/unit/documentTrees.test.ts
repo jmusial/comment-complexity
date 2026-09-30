@@ -1,5 +1,6 @@
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
+import { Language } from "@vscode/tree-sitter-wasm";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DocumentTrees,
   GrammarLoader,
@@ -9,6 +10,10 @@ import {
 
 const wasmDir = path.resolve("node_modules/@vscode/tree-sitter-wasm/wasm");
 const loader = new GrammarLoader(wasmDir, wasmDir);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /** Minimal mutable stand-in for `vscode.TextDocument`. */
 class FakeDocument implements SourceDocument {
@@ -158,5 +163,25 @@ describe("DocumentTrees", () => {
 
     await expect(trees.open("a", doc)).resolves.toBeUndefined();
     expect(trees.update("a", doc, [doc.replace(0, 0, "x")])).toBeUndefined();
+  });
+
+  it("reports a failed open and retries on the next edit", async () => {
+    const load = vi.spyOn(Language, "load").mockRejectedValueOnce(new Error("boom"));
+    const errors: unknown[] = [];
+    // Fresh loader, so the grammar is not already cached from earlier tests.
+    const trees = new DocumentTrees(new GrammarLoader(wasmDir, wasmDir), (_key, error) => {
+      errors.push(error);
+    });
+    const doc = new FakeDocument(source);
+
+    await expect(trees.open("a", doc)).resolves.toBeUndefined();
+    expect(errors).toEqual([new Error("boom")]);
+
+    expect(trees.update("a", doc, [doc.replace(0, 0, "// retry\n")])).toBeUndefined();
+    await vi.waitFor(() => expect(trees.get("a")).toBeDefined());
+    expect(trees.get("a")?.rootNode.text).toBe(doc.text);
+    expect(load).toHaveBeenCalledTimes(2);
+
+    trees.dispose();
   });
 });

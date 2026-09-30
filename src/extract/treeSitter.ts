@@ -122,18 +122,27 @@ export class DocumentTrees {
   /** Token per document whose grammar is still loading; replaced or dropped to cancel that open. */
   private readonly opening = new Map<string, object>();
 
-  constructor(private readonly loader: GrammarLoader) {}
+  constructor(
+    private readonly loader: GrammarLoader,
+    private readonly onError?: (key: string, error: unknown) => void,
+  ) {}
 
   get(key: string): Tree | undefined {
     return this.entries.get(key)?.tree;
   }
 
-  /** Parses the document fully. Resolves `undefined` for unsupported languages or if closed meanwhile. */
+  /**
+   * Parses the document fully. Never rejects: failures go to `onError`. Resolves `undefined`
+   * for unsupported languages, failures, or if closed meanwhile.
+   */
   open(key: string, document: SourceDocument): Promise<Tree | undefined> {
     this.close(key);
     const token = {};
     this.opening.set(key, token);
-    return this.parseFresh(key, document, token);
+    return this.parseFresh(key, document, token).catch((error: unknown) => {
+      this.onError?.(key, error);
+      return undefined;
+    });
   }
 
   /**
@@ -143,7 +152,11 @@ export class DocumentTrees {
   update(key: string, document: SourceDocument, changes: readonly TextChange[]): Tree | undefined {
     const entry = this.entries.get(key);
     if (!entry) {
-      // Still opening: the pending full parse reads the latest text once the grammar is ready.
+      // A pending open reads the latest text once the grammar is ready. Without one, an earlier
+      // open failed, so try again rather than leave the document unparsed until it is reopened.
+      if (!this.opening.has(key) && this.loader.supports(document.languageId)) {
+        void this.open(key, document);
+      }
       return undefined;
     }
     if (entry.version === document.version) {

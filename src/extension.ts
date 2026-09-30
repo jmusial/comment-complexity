@@ -19,12 +19,13 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
 
   // esbuild copies the runtime next to the bundle and grammars into dist/grammars.
   const dist = vscode.Uri.joinPath(context.extensionUri, "dist").fsPath;
-  const trees = new DocumentTrees(new GrammarLoader(dist, path.join(dist, "grammars")));
+  const trees = new DocumentTrees(
+    new GrammarLoader(dist, path.join(dist, "grammars")),
+    (uri, error) => log.error(`Failed to parse ${uri}`, error),
+  );
 
   const open = (document: vscode.TextDocument) => {
-    trees.open(key(document), document).catch((error: unknown) => {
-      log.error(`Failed to parse ${document.uri.fsPath} (${document.languageId})`, error);
-    });
+    void trees.open(key(document), document);
   };
 
   // A language mode switch arrives as close + open, so the grammar is swapped too.
