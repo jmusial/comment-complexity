@@ -75,8 +75,43 @@ describe("textStats", () => {
     expect(textStats("Documentation created unavoidable problems.").complexWords).toBe(2);
   });
 
+  it.each([
+    ["documentation", 1],
+    // "recipe" already has three syllables; the -s adds none.
+    ["recipes", 1],
+    // The ending adds the third syllable.
+    ["created", 0],
+    ["committed", 0],
+    ["processes", 0],
+    ["documenting", 1],
+    // Compounds of one-syllable parts read easily; a long part still counts.
+    ["state-of-the-art", 0],
+    ["high-performance", 1],
+    ["cat", 0],
+  ])("rates %s as %i complex", (word, complex) => {
+    expect(textStats(word).complexWords).toBe(complex);
+  });
+
+  it.each([
+    ['"Retry now." Stop here.', 2],
+    ["(See the docs.) Then retry.", 2],
+    ["It fails! Why? Nobody knows.", 3],
+  ])("splits %j into %i sentences", (text, sentences) => {
+    expect(textStats(text).sentences).toBe(sentences);
+  });
+
   it("ignores punctuation and bare numbers", () => {
     expect(textStats("Retry 3 times — then stop.")).toMatchObject({ sentences: 1, words: 4 });
+  });
+
+  it.each(["", "---\n\n", "42"])("finds nothing in %j", (text) => {
+    expect(textStats(text)).toEqual({
+      sentences: 0,
+      words: 0,
+      syllables: 0,
+      letters: 0,
+      complexWords: 0,
+    });
   });
 });
 

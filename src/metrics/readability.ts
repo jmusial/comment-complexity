@@ -12,14 +12,33 @@ export interface TextStats {
   readonly words: number;
   readonly syllables: number;
   readonly letters: number;
-  /** Words of three or more syllables, not counting an -es, -ed or -ing ending (Gunning's rule). */
+  /** Words of three or more syllables, by Gunning's rule (see `isComplex`). */
   readonly complexWords: number;
 }
 
-/** A sentence ends at . ! or ?, except after common abbreviations. */
-const SENTENCE_END = /(?<=[.!?])(?<!\b(?:e\.g|i\.e|etc|vs|cf)\.)\s+/i;
+/**
+ * A sentence ends at . ! or ?, maybe followed by closing quotes or brackets (`"Retry now." Stop.`),
+ * except after common abbreviations.
+ */
+const SENTENCE_END = /(?<=[.!?]["'”’)\]]*)(?<!\b(?:e\.g|i\.e|etc|vs|cf)\.)\s+/i;
 
 const WORD = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu;
+
+/**
+ * Gunning's complex word: three or more syllables, not counting an ending that only adds one
+ * (-ing always; -ed after t or d, as in "created"; -es after a sibilant, as in "processes"), and not
+ * a hyphenated compound of one-syllable parts ("state-of-the-art").
+ */
+function isComplex(word: string, syllables: number): boolean {
+  const parts = word.split("-");
+  if (parts.length > 1 && parts.every((part) => syllable(part) <= 1)) {
+    return false;
+  }
+  const lower = word.toLowerCase();
+  const syllabicEnding =
+    lower.endsWith("ing") || /[td]ed$/.test(lower) || /(?:[cgsxz]|[cs]h)es$/.test(lower);
+  return syllables - (syllabicEnding ? 1 : 0) >= 3;
+}
 
 /** Counts sentences, words, syllables and letters of normalized comment text; each line is a unit. */
 export function textStats(text: string): TextStats {
@@ -31,7 +50,9 @@ export function textStats(text: string): TextStats {
   for (const line of text.split("\n")) {
     for (const sentence of line.split(SENTENCE_END)) {
       // A unit without end punctuation, like a @param description, still counts as a sentence.
-      const found = (sentence.match(WORD) ?? []).filter((word) => /\p{L}/u.test(word));
+      const found = [...sentence.matchAll(WORD)]
+        .map(([word]) => word)
+        .filter((word) => /\p{L}/u.test(word));
       if (found.length === 0) {
         continue;
       }
@@ -40,9 +61,8 @@ export function textStats(text: string): TextStats {
         const count = Math.max(1, syllable(word));
         words++;
         syllables += count;
-        letters += (word.match(/\p{L}/gu) ?? []).length;
-        const stem = word.replace(/(?:es|ed|ing)$/i, "");
-        if (count >= 3 && (stem === word || syllable(stem) >= 3)) {
+        letters += word.replace(/\P{L}/gu, "").length;
+        if (isComplex(word, count)) {
           complexWords++;
         }
       }
