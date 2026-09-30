@@ -6,10 +6,6 @@ import { LANGUAGES } from "./languages";
 const GRAMMARS = new Map<string, string>([
   ...[...LANGUAGES].map(([id, spec]) => [id, spec.grammar] as const),
   // Parsed but not extracted yet; each moves into LANGUAGES once it has comment rules.
-  ["python", "python"],
-  ["go", "go"],
-  ["rust", "rust"],
-  ["java", "java"],
   ["csharp", "c-sharp"],
   ["cpp", "cpp"],
   ["css", "css"],

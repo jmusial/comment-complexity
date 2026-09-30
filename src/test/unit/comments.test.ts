@@ -1,28 +1,5 @@
-import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Comment, extractComments } from "../../extract/comments";
-import { LANGUAGES } from "../../extract/languages";
-import { GrammarLoader } from "../../extract/treeSitter";
-
-const wasmDir = path.resolve("node_modules/@vscode/tree-sitter-wasm/wasm");
-const loader = new GrammarLoader(wasmDir, wasmDir);
-
-async function extract(lines: string[], languageId = "typescript"): Promise<Comment[]> {
-  const parser = (await loader.createParser(languageId))!;
-  const tree = parser.parse(lines.join("\n"))!;
-  try {
-    return extractComments(tree, LANGUAGES.get(languageId)!);
-  } finally {
-    tree.delete();
-    parser.delete();
-  }
-}
-
-const summary = ({ kind, rawText, targetSymbolName }: Comment) => ({
-  kind,
-  rawText,
-  target: targetSymbolName,
-});
+import { extract, summary } from "./extract";
 
 describe("extractComments", () => {
   it("extracts doc, block and line comments", async () => {
