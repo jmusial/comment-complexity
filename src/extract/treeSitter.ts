@@ -1,12 +1,11 @@
 import * as path from "node:path";
 import { type Edit, Language, Parser, type Point, type Tree } from "@vscode/tree-sitter-wasm";
+import { LANGUAGES } from "./languages";
 
 /** VS Code language id to grammar file stem (`tree-sitter-<stem>.wasm`). */
 const GRAMMARS = new Map<string, string>([
-  ["typescript", "typescript"],
-  ["typescriptreact", "tsx"],
-  ["javascript", "javascript"],
-  ["javascriptreact", "javascript"],
+  ...[...LANGUAGES].map(([id, spec]) => [id, spec.grammar] as const),
+  // Parsed but not extracted yet; each moves into LANGUAGES once it has comment rules.
   ["python", "python"],
   ["go", "go"],
   ["rust", "rust"],
