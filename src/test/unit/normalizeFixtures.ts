@@ -322,6 +322,12 @@ export const FIXTURES: Record<Dialect, readonly Fixture[]> = {
       text: "Keeps bold text.",
       identifiers: [],
     },
+    {
+      // The full stop ends the sentence, not the name.
+      raw: "/** Returns @p value. */",
+      text: "Returns value.",
+      identifiers: ["value"],
+    },
   ],
   markdown: [
     {
@@ -458,6 +464,32 @@ export const FIXTURES: Record<Dialect, readonly Fixture[]> = {
       ].join("\n"),
       // "```ts" cannot close a "```" fence, so the code stays inside it.
       text: ["Example of a doc snippet:", "Done."].join("\n"),
+      identifiers: [],
+    },
+    {
+      // A definition's title on the next line is part of the definition.
+      raw: [
+        "/// See [guide][book].",
+        "///",
+        "/// [book]: https://example.com",
+        '///   "Reference title"',
+      ].join("\n"),
+      text: "See guide.",
+      identifiers: [],
+    },
+    {
+      // Destination on its own line, then a title spanning two lines.
+      raw: [
+        "/// Read the [spec][cm] first.",
+        "///",
+        "/// [cm]:",
+        "///   https://spec.commonmark.org",
+        "///   'CommonMark",
+        "///   spec'",
+        "///",
+        "/// Then the tests.",
+      ].join("\n"),
+      text: ["Read the spec first.", "Then the tests."].join("\n"),
       identifiers: [],
     },
   ],

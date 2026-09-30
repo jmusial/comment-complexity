@@ -139,6 +139,14 @@ function withoutCode(lines: string[]): string[] {
 }
 
 /**
+ * A link reference definition, `[label]: destination "title"`. CommonMark lets the destination and
+ * the title follow on later lines, and the title span several lines.
+ */
+const DEFINITION = /^\[[^\]]+\]:(?:\s+(\S+))?/;
+
+const TITLE_CLOSE: Readonly<Record<string, string>> = { '"': '"', "'": "'", "(": ")" };
+
+/**
  * Joins lines into units: paragraphs, tag sections and list items. Drops markdown headings and
  * link reference definitions.
  */
@@ -151,9 +159,42 @@ function units(lines: string[]): string[] {
       current = [];
     }
   };
+  // What a link reference definition may still continue with on the next lines.
+  let definition: "destination" | "title" | undefined;
+  // Closing character of a title that spans lines.
+  let titleClose: string | undefined;
   for (const raw of lines) {
     const line = raw.trim();
-    if (line === "" || /^#{1,6}\s/.test(line) || /^\[[^\]]+\]:\s/.test(line)) {
+    if (titleClose !== undefined && line !== "") {
+      if (line.endsWith(titleClose)) {
+        titleClose = undefined;
+      }
+      continue;
+    }
+    // A blank line ends a title.
+    titleClose = undefined;
+    if (definition !== undefined && line !== "") {
+      if (definition === "destination" && /^\S+$/.test(line)) {
+        definition = "title";
+        continue;
+      }
+      const close = TITLE_CLOSE[line[0]!];
+      if (definition === "title" && close !== undefined) {
+        definition = undefined;
+        if (line.length === 1 || !line.endsWith(close)) {
+          titleClose = close;
+        }
+        continue;
+      }
+    }
+    definition = undefined;
+    const reference = DEFINITION.exec(line);
+    if (reference) {
+      flush();
+      definition = reference[1] === undefined ? "destination" : "title";
+      continue;
+    }
+    if (line === "" || /^#{1,6}\s/.test(line)) {
       flush();
       continue;
     }
@@ -214,8 +255,10 @@ function inline(unit: string, dialect: Dialect, identifiers: Set<string>): strin
       .replace(/\{@(?:code|literal)\s+([^}]*)\}/g, (_, source: string) => code(source))
       .replace(/\{@\w+[^}]*\}/g, "")
       // Doxygen's inline `@p name`, `\c name`, `@ref name`.
-      .replace(/(?<![\w@])[@\\](?:p|a|c|e|b|em|ref)\s+([\w$:.]+)/g, (_, name: string) =>
-        code(name),
+      // Whole name segments only, so a sentence's full stop stays out of the name.
+      .replace(
+        /(?<![\w@])[@\\](?:p|a|c|e|b|em|ref)\s+([\w$]+(?:(?:::|\.)[\w$]+)*)/g,
+        (_, name: string) => code(name),
       );
   }
   if (dialect === "python") {
