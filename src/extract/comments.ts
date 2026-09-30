@@ -99,10 +99,15 @@ function endOf(node: Node, spec: LanguageSpec): Point {
 function openerOf(node: Node, spec: LanguageSpec): string {
   const text = node.text;
   return (
-    [...spec.docPrefixes, spec.linePrefix, spec.block?.start].find(
+    [...spec.docPrefixes, ...spec.linePrefixes, spec.block?.start].find(
       (prefix) => prefix !== undefined && text.startsWith(prefix),
     ) ?? ""
   );
+}
+
+/** The line prefix a comment starts with, also under a longer doc prefix like `///`. */
+function linePrefixOf(node: Node, spec: LanguageSpec): string | undefined {
+  return spec.linePrefixes.find((prefix) => node.text.startsWith(prefix));
 }
 
 function kindOf(node: Node, spec: LanguageSpec): CommentKind {
@@ -110,17 +115,18 @@ function kindOf(node: Node, spec: LanguageSpec): CommentKind {
   if (spec.docPrefixes.includes(opener)) {
     return "doc";
   }
-  return opener === spec.linePrefix ? "line" : "block";
+  return spec.linePrefixes.includes(opener) ? "line" : "block";
 }
 
 /** Comment text without markers, leading `*` gutters or surrounding whitespace. */
 function bodyOf(node: Node, spec: LanguageSpec): string {
   const text = textOf(node);
   const opener = openerOf(node, spec);
-  if (text.startsWith(spec.linePrefix)) {
+  const linePrefix = linePrefixOf(node, spec);
+  if (linePrefix !== undefined) {
     let body = text.slice(opener.length);
     // `////` or `##` are still plain line comments.
-    while (body !== "" && spec.linePrefix.includes(body[0]!)) {
+    while (body !== "" && linePrefix.includes(body[0]!)) {
       body = body.slice(1);
     }
     return body.trim();
@@ -146,8 +152,8 @@ function isTrailing(node: Node, spec: LanguageSpec): boolean {
 
 function continuesRun(last: Node, node: Node, spec: LanguageSpec): boolean {
   return (
-    last.text.startsWith(spec.linePrefix) &&
-    // Plain and doc line comments (`//` vs `///`) do not mix.
+    linePrefixOf(last, spec) !== undefined &&
+    // Plain and doc line comments (`//` vs `///`), or `//` and `#` in PHP, do not mix.
     openerOf(last, spec) === openerOf(node, spec) &&
     !isTrailing(last, spec) &&
     !isTrailing(node, spec) &&
@@ -157,13 +163,17 @@ function continuesRun(last: Node, node: Node, spec: LanguageSpec): boolean {
   );
 }
 
-/** Top level, with only comments or a shebang before it. */
+/** Top level, with only comments, a shebang or a preamble like `<?php` before it. */
 function atFileStart(node: Node, spec: LanguageSpec): boolean {
   if (node.parent?.parent !== null) {
     return false;
   }
   for (let previous = node.previousSibling; previous; previous = previous.previousSibling) {
-    if (!isShebang(previous) && !spec.commentTypes.includes(previous.type)) {
+    const skippable =
+      isShebang(previous) ||
+      spec.commentTypes.includes(previous.type) ||
+      spec.preambleTypes?.includes(previous.type) === true;
+    if (!skippable) {
       return false;
     }
   }
@@ -249,23 +259,39 @@ function enclosingName(node: Node, spec: LanguageSpec): string | undefined {
 function nameOf(node: Node, spec: LanguageSpec): string | undefined {
   if (spec.wrapperTypes.includes(node.type)) {
     const inner = node.namedChildren.find(
-      (child) =>
-        child !== null &&
-        (spec.declarationTypes.includes(child.type) || spec.wrapperTypes.includes(child.type)),
+      (child) => child !== null && !spec.attachedTypes.includes(child.type),
     );
     return inner ? nameOf(inner, spec) : undefined;
   }
-  if (!spec.declarationTypes.includes(node.type)) {
-    return undefined;
+  return spec.declarationTypes.includes(node.type) ? nameIn(node)?.text : undefined;
+}
+
+/** Node types that name a symbol, across grammars. */
+const IDENTIFIER = /identifier$|^(?:constant|name|word|variable_name)$/;
+
+/** Node types that carry a name further down, like C's `function_declarator` or Go's `var_spec`. */
+const DECLARATOR = /(?:declarator|declaration|_spec|_element)$/;
+
+const NAME_FIELDS = ["name", "property", "declarator", "left"];
+
+/** Follows name fields, then unlabelled declarators, down to the identifier. */
+function nameIn(node: Node): Node | undefined {
+  for (const field of NAME_FIELDS) {
+    const child = node.childForFieldName(field);
+    if (child) {
+      if (IDENTIFIER.test(child.type)) {
+        return child;
+      }
+      // Destructuring patterns and string keys have no single name.
+      return DECLARATOR.test(child.type) ? nameIn(child) : undefined;
+    }
   }
-  // Variable declarations name their first declarator; others, like a Python assignment or a Go
-  // package clause, lead with the identifier itself.
-  const declarator = node.childForFieldName("declarator") ?? node.firstNamedChild;
-  const name =
-    node.childForFieldName("name") ??
-    node.childForFieldName("property") ??
-    declarator?.childForFieldName("name") ??
-    declarator;
-  // Destructuring patterns and string keys have no single name.
-  return name && name.type.endsWith("identifier") ? name.text : undefined;
+  // Declarators come before bare identifiers, which may be types (C#'s `variable_declaration`).
+  const children = node.namedChildren.filter((child) => child !== null);
+  const declarator = children.find((child) => DECLARATOR.test(child.type));
+  if (declarator) {
+    return nameIn(declarator);
+  }
+  // Go's `package` clause or Rust's `impl` name what follows the keyword.
+  return children.find((child) => IDENTIFIER.test(child.type));
 }
