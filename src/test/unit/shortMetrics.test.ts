@@ -158,5 +158,20 @@ describe("undefinedAcronyms", () => {
       "Retries/VERB MQ/PROPN and/CCONJ SQS/PROPN calls/NOUN",
       { value: 2, reason: "Undefined acronyms: MQ, SQS" },
     ],
+    // Parentheses alone do not define it; the words must spell it out.
+    [
+      "Retries/VERB SQS/PROPN (/PUNCT see/VERB docs/NOUN )/PUNCT",
+      { value: 1, reason: "Undefined acronym: SQS" },
+    ],
+    [
+      "See/VERB the/DET docs/NOUN (/PUNCT SQS/PROPN )/PUNCT",
+      { value: 1, reason: "Undefined acronym: SQS" },
+    ],
+    ["Uses/VERB SQS/PROPN (/PUNCT Simple/PROPN Queue/PROPN Service/PROPN )/PUNCT", { value: 0 }],
+    // Minor words may be skipped or counted.
+    [
+      "Uses/VERB the/DET Bureau/PROPN of/ADP Labor/PROPN Statistics/PROPN (/PUNCT BLS/PROPN )/PUNCT",
+      { value: 0 },
+    ],
   ]);
 });

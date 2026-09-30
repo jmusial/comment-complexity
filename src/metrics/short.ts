@@ -281,6 +281,49 @@ export const KNOWN_ACRONYMS: ReadonlySet<string> = new Set([
   "YAML",
 ]);
 
+/** Words an expansion may skip, like the "of" in "Bureau of Labor Statistics" (BLS). */
+const MINOR_WORDS = new Set(["a", "an", "and", "for", "in", "of", "on", "the", "to"]);
+
+const isPlainWord = (token: Token): boolean => /^[A-Za-z][A-Za-z'-]*$/.test(token.text);
+
+const initials = (words: readonly Token[]): string =>
+  words.map((word) => word.text[0]!.toUpperCase()).join("");
+
+/** Whether the words' initials spell the acronym, with or without minor words. */
+function expands(words: readonly Token[], acronym: string): boolean {
+  return (
+    initials(words) === acronym ||
+    initials(words.filter((word) => !MINOR_WORDS.has(word.normal))) === acronym
+  );
+}
+
+/**
+ * Whether the acronym at `index` comes with its expansion: "TTL (time to live)" or
+ * "time to live (TTL)". A parenthetical that does not spell it out ("SQS (see docs)") is no definition.
+ */
+function definedInPlace(tokens: readonly Token[], index: number, acronym: string): boolean {
+  if (tokens[index + 1]?.text === "(") {
+    const close = tokens.findIndex((token, i) => i > index + 1 && token.text === ")");
+    const inside = tokens.slice(index + 2, close === -1 ? undefined : close);
+    if (inside.every(isPlainWord) && expands(inside, acronym)) {
+      return true;
+    }
+  }
+  if (tokens[index - 1]?.text === "(") {
+    const before: Token[] = [];
+    for (let i = index - 2; i >= 0 && isPlainWord(tokens[i]!); i--) {
+      before.unshift(tokens[i]!);
+    }
+    // The expansion ends right before "(", so try each run of preceding words that could spell it.
+    for (let length = acronym.length; length <= before.length; length++) {
+      if (expands(before.slice(-length), acronym)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * All-caps words the reader may not know: not in `KNOWN_ACRONYMS`, not in the code's identifiers
  * or the workspace vocabulary, and not defined in place ("time to live (TTL)" or "TTL (time to live)").
@@ -295,8 +338,7 @@ export const undefinedAcronyms: Metric = (tokens, context) => {
     if (acronym === undefined || KNOWN_ACRONYMS.has(acronym) || known.has(acronym)) {
       continue;
     }
-    const definedHere = tokens[i - 1]?.text === "(" || tokens[i + 1]?.text === "(";
-    if (!definedHere) {
+    if (!definedInPlace(tokens, i, acronym)) {
       undefinedOnes.add(acronym);
     }
   }
