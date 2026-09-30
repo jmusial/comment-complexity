@@ -115,7 +115,9 @@ function withoutCode(lines: string[]): string[] {
   for (const line of lines) {
     const trimmed = line.trim();
     if (fence !== undefined) {
-      if (trimmed.startsWith(fence)) {
+      // CommonMark: same character, at least as long, nothing after it. "```ts" stays inside.
+      const closing = /^(`{3,}|~{3,})\s*$/.exec(trimmed)?.[1];
+      if (closing !== undefined && closing[0] === fence[0] && closing.length >= fence.length) {
         fence = undefined;
       }
       continue;
@@ -136,7 +138,10 @@ function withoutCode(lines: string[]): string[] {
   return out;
 }
 
-/** Joins lines into units: paragraphs, tag sections and list items. Drops markdown headings. */
+/**
+ * Joins lines into units: paragraphs, tag sections and list items. Drops markdown headings and
+ * link reference definitions.
+ */
 function units(lines: string[]): string[] {
   const result: string[] = [];
   let current: string[] = [];
@@ -148,7 +153,7 @@ function units(lines: string[]): string[] {
   };
   for (const raw of lines) {
     const line = raw.trim();
-    if (line === "" || /^#{1,6}\s/.test(line)) {
+    if (line === "" || /^#{1,6}\s/.test(line) || /^\[[^\]]+\]:\s/.test(line)) {
       flush();
       continue;
     }
@@ -183,7 +188,11 @@ const ENTITIES: Record<string, string> = {
 function inline(unit: string, dialect: Dialect, identifiers: Set<string>): string {
   /** Inline code: a single reference reads as its words, anything longer is dropped. */
   const code = (source: string): string => {
-    const trimmed = source.trim();
+    // Rust's `&str` or `&mut T` read as the type.
+    const trimmed = source.trim().replace(/^(?:&(?:mut\s+)?|\*+)/, "");
+    if (/^\d[\d_.]*$/.test(trimmed)) {
+      return trimmed;
+    }
     if (!CODE_REFERENCE.test(trimmed)) {
       return "";
     }
@@ -203,7 +212,11 @@ function inline(unit: string, dialect: Dialect, identifiers: Set<string>): strin
               code(target.replace(/^#/, "").replace(/\([^)]*\)$/, "()")),
       )
       .replace(/\{@(?:code|literal)\s+([^}]*)\}/g, (_, source: string) => code(source))
-      .replace(/\{@\w+[^}]*\}/g, "");
+      .replace(/\{@\w+[^}]*\}/g, "")
+      // Doxygen's inline `@p name`, `\c name`, `@ref name`.
+      .replace(/(?<![\w@])[@\\](?:p|a|c|e|b|em|ref)\s+([\w$:.]+)/g, (_, name: string) =>
+        code(name),
+      );
   }
   if (dialect === "python") {
     // reST roles like :class:`Foo`, :func:`text <target>` or :meth:`~pkg.Foo.bar` (shown as `bar`).
@@ -229,10 +242,17 @@ function inline(unit: string, dialect: Dialect, identifiers: Set<string>): strin
   }
   text = text.replace(/(`+)([^`]+?)\1/g, (_, _ticks: string, source: string) => code(source));
   if (dialect === "jsdoc" || dialect === "xmldoc" || dialect === "markdown") {
-    text = text
-      .replace(/<code>([\s\S]*?)<\/code>/gi, (_, source: string) => code(source))
-      .replace(/<\/?[a-zA-Z][\w-]*(?:\s[^<>]*)?\/?>/g, "")
-      .replace(/&(?:lt|gt|amp|quot|#39|apos|nbsp);/g, (entity) => ENTITIES[entity] ?? entity);
+    text = text.replace(/<code>([\s\S]*?)<\/code>/gi, (_, source: string) => code(source));
+    // Until stable, so removing one tag cannot join the text around it into another (`<<b>i>`).
+    for (let previous = ""; previous !== text;) {
+      previous = text;
+      text = text.replace(/<\/?[a-zA-Z][\w-]*(?:\s[^<>]*)?\/?>/g, "");
+    }
+    // Entities go last, so an escaped `&lt;T&gt;` stays as text.
+    text = text.replace(
+      /&(?:lt|gt|amp|quot|#39|apos|nbsp);/g,
+      (entity) => ENTITIES[entity] ?? entity,
+    );
   }
   return text
     .replace(/\*\*([^*]+)\*\*/g, "$1")

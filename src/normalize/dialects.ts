@@ -34,6 +34,8 @@ const DESCRIBED = new Set([
   "todo",
   "fileoverview",
   "classdesc",
+  "constructor",
+  "receiver",
   "pre",
   "post",
 ]);
@@ -76,7 +78,8 @@ export function jsdocLines(lines: string[], identifiers: Set<string>): string[] 
     if (NAMED.has(name)) {
       rest = withoutName(rest, identifiers);
     } else if (THROWN.has(name) && rest === afterTag) {
-      const type = /^([A-Z][\w.]*|[\w]+(?:\.[\w]+)+)\s*/.exec(rest);
+      // `IOException`, `java.io.IOException` or PHP's `\App\NotFound`.
+      const type = /^(\\?[A-Z][\w.\\]*|\w+(?:\.\w+)+)\s*/.exec(rest);
       if (type) {
         identifiers.add(type[1]!);
         rest = rest.slice(type[0].length);
