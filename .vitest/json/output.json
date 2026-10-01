@@ -1,0 +1,218 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 16,
+  "numPassedTests": 15,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790841650000,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["difficulty"],
+          "fullName": "difficulty ramps 2 between easy 2 and hard 5 to 0",
+          "status": "passed",
+          "title": "ramps 2 between easy 2 and hard 5 to 0",
+          "duration": 0.5152499999999947,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["difficulty"],
+          "fullName": "difficulty ramps 3.5 between easy 2 and hard 5 to 0.5",
+          "status": "passed",
+          "title": "ramps 3.5 between easy 2 and hard 5 to 0.5",
+          "duration": 0.056708000000000425,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["difficulty"],
+          "fullName": "difficulty ramps 5 between easy 2 and hard 5 to 1",
+          "status": "passed",
+          "title": "ramps 5 between easy 2 and hard 5 to 1",
+          "duration": 0.041249999999990905,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["difficulty"],
+          "fullName": "difficulty ramps 0 between easy 2 and hard 5 to 0",
+          "status": "passed",
+          "title": "ramps 0 between easy 2 and hard 5 to 0",
+          "duration": 0.049374999999997726,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["difficulty"],
+          "fullName": "difficulty ramps 9 between easy 2 and hard 5 to 1",
+          "status": "passed",
+          "title": "ramps 9 between easy 2 and hard 5 to 1",
+          "duration": 0.036000000000001364,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["difficulty"],
+          "fullName": "difficulty ramps the other way when lower is harder",
+          "status": "passed",
+          "title": "ramps the other way when lower is harder",
+          "duration": 0.07758400000000165,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite scores 0 with no reasons when every metric is easy",
+          "status": "passed",
+          "title": "scores 0 with no reasons when every metric is easy",
+          "duration": 0.4938329999999951,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite scores 10 when every metric is hard, short or long",
+          "status": "passed",
+          "title": "scores 10 when every metric is hard, short or long",
+          "duration": 0.12041700000000333,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite blends the readability formulas in by length",
+          "status": "passed",
+          "title": "blends the readability formulas in by length",
+          "duration": 0.15587499999999466,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite gives the reasons of the biggest contributors, at most three",
+          "status": "passed",
+          "title": "gives the reasons of the biggest contributors, at most three",
+          "duration": 0.35454200000000924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite names uncommon vocabulary, which has no reason of its own",
+          "status": "passed",
+          "title": "names uncommon vocabulary, which has no reason of its own",
+          "duration": 0.07283300000000281,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite leaves out reasons of metrics that add nothing",
+          "status": "passed",
+          "title": "leaves out reasons of metrics that add nothing",
+          "duration": 0.058625000000006366,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite takes other weights",
+          "status": "passed",
+          "title": "takes other weights",
+          "duration": 0.07354199999998912,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["composite"],
+          "fullName": "composite scores 0 when nothing has weight",
+          "status": "passed",
+          "title": "scores 0 when nothing has weight",
+          "duration": 0.05262500000000614,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["scoreComment"],
+          "fullName": "scoreComment scores plain comments low and dense ones high",
+          "status": "failed",
+          "title": "scores plain comments low and dense ones high",
+          "duration": 30.50329099999999,
+          "failureMessages": [
+            "AssertionError: expected { score: 0.4, …(2) } to match object { score: +0, reasons: [] }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/vitest@5.0.2_@types+node@24.19.0_@vitest+coverage-v8@5.0.2_vite@8.3.1_@types+node@24.19.0_esbuild@0.28.2_/node_modules/vitest/dist/chunks/index.DGdajAO2.js:2051:10)\n    at Proxy.<anonymous> (file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/vitest@5.0.2_@types+node@24.19.0_@vitest+coverage-v8@5.0.2_vite@8.3.1_@types+node@24.19.0_esbuild@0.28.2_/node_modules/vitest/dist/chunks/index.DGdajAO2.js:1945:14)\n    at Proxy.methodWrapper (file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at /Users/janmusial/workspace/rnd/comment-complexity/src/test/unit/composite.test.ts:170:19\n    at file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/vitest@5.0.2_@types+node@24.19.0_@vitest+coverage-v8@5.0.2_vite@8.3.1_@types+node@24.19.0_esbuild@0.28.2_/node_modules/vitest/dist/chunks/run.C5UmxDPh.js:1628:35\n    at file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/vitest@5.0.2_@types+node@24.19.0_@vitest+coverage-v8@5.0.2_vite@8.3.1_@types+node@24.19.0_esbuild@0.28.2_/node_modules/vitest/dist/chunks/run.C5UmxDPh.js:2783:26\n    at file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/vitest@5.0.2_@types+node@24.19.0_@vitest+coverage-v8@5.0.2_vite@8.3.1_@types+node@24.19.0_esbuild@0.28.2_/node_modules/vitest/dist/chunks/run.C5UmxDPh.js:3319:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/vitest@5.0.2_@types+node@24.19.0_@vitest+coverage-v8@5.0.2_vite@8.3.1_@types+node@24.19.0_esbuild@0.28.2_/node_modules/vitest/dist/chunks/run.C5UmxDPh.js:3314:10)\n    at file:///Users/janmusial/workspace/rnd/comment-complexity/node_modules/.pnpm/vitest@5.0.2_@types+node@24.19.0_@vitest+coverage-v8@5.0.2_vite@8.3.1_@types+node@24.19.0_esbuild@0.28.2_/node_modules/vitest/dist/chunks/run.C5UmxDPh.js:3299:20"
+          ],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["scoreComment"],
+          "fullName": "scoreComment counts readability for long comments",
+          "status": "passed",
+          "title": "counts readability for long comments",
+          "duration": 0.5229170000000067,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        }
+      ],
+      "startTime": 1790841650149,
+      "endTime": 1790841650182.523,
+      "status": "failed",
+      "message": "",
+      "name": "/Users/janmusial/workspace/rnd/comment-complexity/src/test/unit/composite.test.ts"
+    }
+  ]
+}
