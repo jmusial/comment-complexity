@@ -75,8 +75,16 @@ const EXCLUDED_FOLDERS = new Set([
   "__pycache__",
 ]);
 
-export const INCLUDE = `**/*.{${[...LANGUAGE_BY_EXTENSION.keys()].join(",")}}`;
+const SOURCE_FILES = `*.{${[...LANGUAGE_BY_EXTENSION.keys()].join(",")}}`;
+
+export const INCLUDE = `**/${SOURCE_FILES}`;
 export const EXCLUDE = `**/{${[...EXCLUDED_FOLDERS].join(",")}}/**`;
+
+/** `INCLUDE` limited to one workspace-relative folder, its glob characters escaped. */
+export function includeUnder(relativeFolder: string): string {
+  const escaped = relativeFolder.replace(/[[\]{}*?]/g, "[$&]");
+  return `${escaped}/**/${SOURCE_FILES}`;
+}
 
 /** The same rules as `INCLUDE` and `EXCLUDE`, for a path relative to the workspace folder. */
 export function isScanned(relativePath: string): boolean {
@@ -153,8 +161,13 @@ export class WorkspaceVocabulary<U extends FileUri> implements Disposable {
     this.parsers.clear();
   }
 
-  private async build(): Promise<void> {
-    const uris = await this.host.findFiles(INCLUDE, EXCLUDE, this.limits.maxFiles);
+  private build(): Promise<void> {
+    return this.scan(INCLUDE);
+  }
+
+  /** Reads every file `include` finds; `update` applies the scan rules and the file limit. */
+  private async scan(include: string): Promise<void> {
+    const uris = await this.host.findFiles(include, EXCLUDE, this.limits.maxFiles);
     for (const uri of uris) {
       try {
         await this.update(uri, () => this.host.readFile(uri));
@@ -228,11 +241,14 @@ export class WorkspaceVocabulary<U extends FileUri> implements Disposable {
         this.vocabulary.remove(key);
       }
     }
-    // A file that was not tracked may now qualify, like notes.txt renamed to notes.ts.
-    if (moved.length === 0 && this.building !== undefined) {
-      this.update(newUri, () => this.host.readFile(newUri)).catch((error: unknown) =>
-        this.onError(newKey, error),
-      );
+    // Untracked items may now qualify: a file like notes.txt renamed to notes.ts, or a folder like
+    // vendor/ renamed to lib/, whose files are then found and read.
+    if (moved.length === 0 && this.building !== undefined && newRelative !== undefined) {
+      const read =
+        languageForPath(newRelative) === undefined
+          ? this.scan(includeUnder(newRelative))
+          : this.update(newUri, () => this.host.readFile(newUri));
+      read.catch((error: unknown) => this.onError(newKey, error));
     }
   }
 

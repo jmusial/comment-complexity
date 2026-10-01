@@ -11,6 +11,7 @@ import {
   type SavedDocument,
   type WorkspaceHost,
   WorkspaceVocabulary,
+  includeUnder,
   isScanned,
 } from "../../vocab/workspace";
 
@@ -28,8 +29,15 @@ class FakeWorkspace implements WorkspaceHost<FileUri> {
   /** Reads of these paths wait until the promise settles. */
   readonly gates = new Map<string, Promise<void>>();
   readonly reads: string[] = [];
+  /** Lists every file for a workspace-wide include, or the files under a folder-scoped one. */
   readonly findFiles = vi.fn<WorkspaceHost<FileUri>["findFiles"]>(
-    async (_include, _exclude, maxResults) => [...this.files.keys()].slice(0, maxResults).map(uri),
+    async (include, _exclude, maxResults) => {
+      const folder = include.startsWith("**/") ? "" : include.slice(0, include.indexOf("/**/"));
+      return [...this.files.keys()]
+        .filter((file) => folder === "" || file.startsWith(`/ws/${folder}/`))
+        .slice(0, maxResults)
+        .map(uri);
+    },
   );
   private readonly saveListeners = new Set<(document: SavedDocument<FileUri>) => void>();
   private readonly deleteListeners = new Set<(event: { files: readonly FileUri[] }) => void>();
@@ -133,6 +141,18 @@ describe("isScanned", () => {
     ["README.md", false],
   ])("%s → %s", (relative, scanned) => {
     expect(isScanned(relative)).toBe(scanned);
+  });
+});
+
+describe("includeUnder", () => {
+  it("scopes the include to a folder", () => {
+    expect(includeUnder("src/billing")).toBe(INCLUDE.replace("**/", "src/billing/**/"));
+  });
+
+  it("escapes glob characters in the folder name", () => {
+    expect(includeUnder("odd[1]{x}?*")).toMatch(
+      /^odd\[\[\]1\[\]\]\[\{\]x\[\}\]\[\?\]\[\*\]\/\*\*\//,
+    );
   });
 });
 
@@ -292,6 +312,37 @@ describe("WorkspaceVocabulary", () => {
 
       workspace.rename("/ws/notes.txt", "/ws/notes.ts");
       await vi.waitFor(async () => expect(await sorted(vocabulary)).toEqual(["note", "title"]));
+      vocabulary.dispose();
+    });
+
+    it("scans an untracked folder renamed into scope", async () => {
+      const { workspace, vocabulary } = setup();
+      workspace.files.set("/ws/vendor/lib.ts", "const zanzibarHelper = 1;");
+      workspace.files.set("/ws/vendor/deep/util.ts", "const quokkaUtil = 1;");
+      expect(await sorted(vocabulary)).toEqual([]);
+
+      workspace.rename("/ws/vendor", "/ws/lib");
+      await vi.waitFor(async () =>
+        expect(await sorted(vocabulary)).toEqual(["helper", "quokka", "util", "zanzibar"]),
+      );
+      expect(workspace.findFiles).toHaveBeenLastCalledWith(
+        includeUnder("lib"),
+        EXCLUDE,
+        DEFAULT_LIMITS.maxFiles,
+      );
+      vocabulary.dispose();
+    });
+
+    it("respects the file limit when scanning a renamed folder", async () => {
+      const { workspace, vocabulary } = setup({ ...DEFAULT_LIMITS, maxFiles: 2 });
+      workspace.files.set("/ws/a.ts", "const alphaValue = 1;");
+      workspace.files.set("/ws/vendor/b.ts", "const betaValue = 1;");
+      workspace.files.set("/ws/vendor/c.ts", "const gammaValue = 1;");
+      await vocabulary.words();
+
+      workspace.rename("/ws/vendor", "/ws/lib");
+      // One slot was left: only one of the two files gets in.
+      await vi.waitFor(async () => expect((await vocabulary.words()).size).toBe(3));
       vocabulary.dispose();
     });
 
