@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { Comment } from "../../extract/comments";
 import type { ScoredComment } from "../../score/analyzer";
 import { type Contribution, type MetricName, composite } from "../../score/composite";
-import { METRICS, diagnosticMessage, hoverMarkdown, lensTitle } from "../../ui/present";
+import {
+  METRICS,
+  diagnosticMessage,
+  hoverMarkdown,
+  lensTitle,
+  reportItems,
+} from "../../ui/present";
 import { PRIOR_WEIGHTS } from "../../score/calibration";
 import { results } from "./metricResults";
 
@@ -146,5 +152,34 @@ describe("diagnosticMessage", () => {
       ),
     ).toBe("Comment complexity 2.6 (easy): Undefined acronyms: SQS, DLQ; 3 negations");
     expect(diagnosticMessage(scored())).toBe("Comment complexity 0.0 (easy)");
+  });
+});
+
+/** `item` moved to `row`, with `text` as its prose. */
+const at = (row: number, text: string, item: ScoredComment): ScoredComment => ({
+  ...item,
+  text,
+  comment: { ...item.comment, range: { start: { row, column: 2 }, end: { row, column: 40 } } },
+});
+
+describe("reportItems", () => {
+  it("lists comments most complex first, keeping document order for ties", () => {
+    const items = reportItems([
+      at(0, "Plain.", scored()),
+      at(4, "Dense.\nSecond line.", scored({ negationCount: { value: 3, reason: "3 negations" } })),
+      at(9, "Also plain.", scored({}, { approx: true })),
+    ]);
+    expect(items.map(({ label, description, detail }) => [label, description, detail])).toEqual([
+      ["1.1  Dense.", "line 5 · easy", "3 negations"],
+      ["0.0  Plain.", "line 1 · easy", ""],
+      ["0.0  Also plain.", "line 10 · easy · approx", ""],
+    ]);
+    expect(items[0]!.scored.comment.range.start.row).toBe(4);
+  });
+
+  it("shortens long first lines", () => {
+    const [item] = reportItems([at(0, "word ".repeat(30), scored())]);
+    expect(item!.label).toHaveLength("0.0  ".length + 80);
+    expect(item!.label.endsWith("…")).toBe(true);
   });
 });

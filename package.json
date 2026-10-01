@@ -184,7 +184,19 @@
           "additionalProperties": false
         }
       }
-    }
+    },
+    "commands": [
+      {
+        "command": "commentComplexity.toggleLenses",
+        "title": "Toggle Lenses",
+        "category": "Comment Complexity"
+      },
+      {
+        "command": "commentComplexity.fileReport",
+        "title": "Complexity Report for File",
+        "category": "Comment Complexity"
+      }
+    ]
   },
   "activationEvents": [
     "onLanguage:c",

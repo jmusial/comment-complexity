@@ -32,12 +32,24 @@ export class ComplexityLensProvider implements vscode.CodeLensProvider {
     private readonly settings: () => Settings,
   ) {}
 
+  /** Hidden by the toggle command, for this session; hovers and diagnostics stay. */
+  private visible = true;
+
   /** Asks VS Code for fresh lenses, as when a document's tree has been parsed. */
   refresh(): void {
     this.changed.fire();
   }
 
+  /** Hides the lenses if shown, shows them if hidden. */
+  toggle(): void {
+    this.visible = !this.visible;
+    this.refresh();
+  }
+
   async provideCodeLenses(document: vscode.TextDocument): Promise<vscode.CodeLens[]> {
+    if (!this.visible) {
+      return [];
+    }
     const settings = this.settings();
     const comments = await analyze(this.analyzer, settings, document);
     return comments.filter(settings.showOnlyAbove ? complex(settings) : () => true).map(

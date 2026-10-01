@@ -42,7 +42,28 @@ export const log = {
   dispose: vi.fn<() => void>(),
 };
 
-export const window = { createOutputChannel: vi.fn<() => typeof log>(() => log) };
+export const window = {
+  createOutputChannel: vi.fn<() => typeof log>(() => log),
+  /** Set by tests; `undefined` when no editor is open. */
+  activeTextEditor: undefined as unknown,
+  showInformationMessage: vi.fn<(message: string) => Promise<undefined>>(async () => undefined),
+  showQuickPick: vi.fn<(items: readonly unknown[], options: object) => Promise<unknown>>(
+    async () => undefined,
+  ),
+  showTextDocument: vi.fn<(document: unknown, options: object) => Promise<unknown>>(
+    async () => undefined,
+  ),
+};
+
+/** Registered command handlers, by id. */
+export const registeredCommands = new Map<string, (...args: unknown[]) => unknown>();
+
+export const commands = {
+  registerCommand: (id: string, handler: (...args: unknown[]) => unknown) => {
+    registeredCommands.set(id, handler);
+    return { dispose: () => registeredCommands.delete(id) };
+  },
+};
 
 interface StubUri {
   readonly path: string;
@@ -73,9 +94,15 @@ export class Position {
 export class Range {
   readonly start: Position;
   readonly end: Position;
-  constructor(startLine: number, startCharacter: number, endLine: number, endCharacter: number) {
-    this.start = new Position(startLine, startCharacter);
-    this.end = new Position(endLine, endCharacter);
+  constructor(start: Position, end: Position);
+  constructor(startLine: number, startCharacter: number, endLine: number, endCharacter: number);
+  constructor(...args: [Position, Position] | [number, number, number, number]) {
+    if (args.length === 2) {
+      [this.start, this.end] = args;
+    } else {
+      this.start = new Position(args[0], args[1]);
+      this.end = new Position(args[2], args[3]);
+    }
   }
   contains({ line, character }: Position): boolean {
     const after =
