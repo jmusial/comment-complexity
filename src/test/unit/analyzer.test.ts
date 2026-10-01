@@ -89,6 +89,26 @@ describe("CommentAnalyzer", () => {
     expect(sources.zipf).toHaveBeenCalledTimes(1);
   });
 
+  it("tries again after a failed analysis, keeping a newer one", async () => {
+    const vocabulary = vi
+      .fn<() => Promise<ReadonlySet<string>>>()
+      .mockRejectedValueOnce(new Error("findFiles failed"))
+      .mockResolvedValue(new Set());
+    const { analyzer: subject } = analyzer({ vocabulary });
+    const doc = document(SOURCE);
+    await trees.open("e.ts", doc);
+
+    await expect(subject.analyze("e.ts", doc)).rejects.toThrow("findFiles failed");
+    expect(await subject.analyze("e.ts", doc)).toHaveLength(2);
+
+    // A failure that settles after a newer version was cached leaves that one alone.
+    vocabulary.mockRejectedValueOnce(new Error("findFiles failed"));
+    const failing = subject.analyze("e.ts", document(SOURCE, "typescript", 2));
+    const newer = subject.analyze("e.ts", document(SOURCE, "typescript", 3));
+    await expect(failing).rejects.toThrow("findFiles failed");
+    expect(subject.analyze("e.ts", document(SOURCE, "typescript", 3))).toBe(newer);
+  });
+
   it("scans fallback languages without a tree, marking them approximate", async () => {
     const doc = document("// Retries the upload when the network drops.\nval x = 1", "kotlin");
     const [scored] = await analyzer().analyzer.analyze("a.kt", doc);

@@ -56,6 +56,12 @@ export class CommentAnalyzer {
     }
     const comments = this.score(document.languageId, found);
     this.cache.set(key, { version: document.version, comments });
+    // A failure, like an unreadable vocabulary, is not kept: the next request tries again.
+    comments.catch(() => {
+      if (this.cache.get(key)?.comments === comments) {
+        this.cache.delete(key);
+      }
+    });
     return comments;
   }
 
