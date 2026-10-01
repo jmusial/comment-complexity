@@ -33,6 +33,15 @@ export class Vocabulary {
     this.cached = undefined;
   }
 
+  /** Moves a file's words to a new key, as when the file is renamed. */
+  rename(from: string, to: string): void {
+    const words = this.byFile.get(from);
+    if (words !== undefined) {
+      this.remove(from);
+      this.set(to, words);
+    }
+  }
+
   remove(file: string): void {
     const words = this.byFile.get(file);
     if (words === undefined) {
@@ -57,7 +66,7 @@ export class Vocabulary {
   words(): ReadonlySet<string> {
     this.cached ??= new Set(
       [...this.fileCounts]
-        .toSorted(([a, countA], [b, countB]) => countB - countA || (a < b ? -1 : 1))
+        .toSorted(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
         .slice(0, this.maxWords)
         .map(([word]) => word),
     );
@@ -130,6 +139,6 @@ export const LANGUAGE_BY_EXTENSION: ReadonlyMap<string, string> = new Map([
 ]);
 
 export function languageForPath(filePath: string): string | undefined {
-  const extension = /\.([^./\\]+)$/.exec(filePath)?.[1]?.toLowerCase();
-  return extension === undefined ? undefined : LANGUAGE_BY_EXTENSION.get(extension);
+  const extension = /\.([^./\\]+)$/.exec(filePath);
+  return extension ? LANGUAGE_BY_EXTENSION.get(extension[1]!.toLowerCase()) : undefined;
 }

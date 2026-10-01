@@ -6,7 +6,7 @@ import { WorkspaceVocabulary } from "./vocab/workspace";
 /** Returned from `activate` so integration tests can inspect extension state. */
 export interface ExtensionApi {
   readonly trees: DocumentTrees;
-  readonly vocabulary: WorkspaceVocabulary;
+  readonly vocabulary: WorkspaceVocabulary<vscode.Uri>;
 }
 
 function key(document: vscode.TextDocument): string {
@@ -26,8 +26,21 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     log.error(`Failed to parse ${uri}`, error),
   );
   // Built lazily, on the first comment that needs it.
-  const vocabulary = new WorkspaceVocabulary(loader, (uri, error) =>
-    log.error(`Failed to read identifiers from ${uri}`, error),
+  const vocabulary = new WorkspaceVocabulary(
+    {
+      findFiles: (include, exclude, maxResults) =>
+        vscode.workspace.findFiles(include, exclude, maxResults),
+      readFile: (uri) => vscode.workspace.fs.readFile(uri),
+      relativePath: (uri) =>
+        vscode.workspace.getWorkspaceFolder(uri) === undefined
+          ? undefined
+          : vscode.workspace.asRelativePath(uri, false),
+      onDidSaveTextDocument: (listener) => vscode.workspace.onDidSaveTextDocument(listener),
+      onDidDeleteFiles: (listener) => vscode.workspace.onDidDeleteFiles(listener),
+      onDidRenameFiles: (listener) => vscode.workspace.onDidRenameFiles(listener),
+    },
+    loader,
+    (uri, error) => log.error(`Failed to read identifiers from ${uri}`, error),
   );
 
   const open = (document: vscode.TextDocument) => {
