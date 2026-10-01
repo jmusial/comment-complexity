@@ -6,6 +6,7 @@ import { DocumentTrees, GrammarLoader } from "./extract/treeSitter";
 import { loadZipf } from "./metrics/zipf";
 import { CommentAnalyzer } from "./score/analyzer";
 import { SECTION, type Settings, parseSettings } from "./settings";
+import { registerCommands } from "./ui/commands";
 import {
   ComplexityDiagnostics,
   ComplexityHoverProvider,
@@ -96,6 +97,11 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     vocabulary,
     lenses,
     collection,
+    ...registerCommands(
+      { analyzer, parsed: (documentKey) => trees.whenParsed(documentKey) },
+      lenses,
+      current,
+    ),
     vscode.languages.registerCodeLensProvider(selector, lenses),
     vscode.languages.registerHoverProvider(
       selector,

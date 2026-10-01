@@ -161,3 +161,31 @@ export function diagnosticMessage({ score }: ScoredComment): string {
   const head = `Comment complexity ${score.score.toFixed(1)} (${score.label})`;
   return score.reasons.length === 0 ? head : `${head}: ${score.reasons.join("; ")}`;
 }
+
+/** One entry of the file report. */
+export interface ReportItem {
+  readonly label: string;
+  readonly description: string;
+  readonly detail: string;
+  readonly scored: ScoredComment;
+}
+
+/** Longest comment excerpt in a report entry. */
+const EXCERPT = 80;
+
+const excerpt = (text: string): string => {
+  const first = text.split("\n")[0]!;
+  return first.length > EXCERPT ? `${first.slice(0, EXCERPT - 1)}…` : first;
+};
+
+/** Report entries, most complex first; equal scores keep document order. */
+export function reportItems(comments: readonly ScoredComment[]): ReportItem[] {
+  return comments
+    .toSorted((a, b) => b.score.score - a.score.score)
+    .map((scored) => ({
+      label: `${scored.score.score.toFixed(1)}  ${excerpt(scored.text)}`,
+      description: `line ${scored.comment.range.start.row + 1} · ${scored.score.label}${scored.comment.approx ? " · approx" : ""}`,
+      detail: scored.score.reasons.join(" · "),
+      scored,
+    }));
+}

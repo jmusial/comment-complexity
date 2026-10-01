@@ -27,6 +27,7 @@ afterEach(() => {
     delete vscode.configuration[setting];
   }
   vscode.workspace.textDocuments.length = 0;
+  vscode.window.activeTextEditor = undefined;
 });
 
 /** A Kotlin document: scanned by the fallback, so it is scored without a grammar. */
@@ -37,6 +38,9 @@ const kotlin = (path = "/ws/a.kt") => ({
   isClosed: false,
   getText: () => "// Retries the upload when the network drops.\nval x = 1",
 });
+
+/** Runs the file report command. */
+const report = () => vscode.registeredCommands.get("commentComplexity.fileReport")!();
 
 /** Changes settings the way the user would, then tells the extension. */
 function configure(values: Record<string, unknown>, section = "commentComplexity") {
@@ -220,6 +224,99 @@ describe("activate", () => {
         expect.anything(),
       ),
     );
+  });
+
+  it("toggles the lenses, leaving hovers", async () => {
+    start();
+    const lensProvider = vscode.languages.registerCodeLensProvider.mock
+      .calls[0]![1] as ComplexityLensProvider;
+    const hoverProvider = vscode.languages.registerHoverProvider.mock
+      .calls[0]![1] as ComplexityHoverProvider;
+    const refreshed = vi.fn<() => void>();
+    lensProvider.onDidChangeCodeLenses(refreshed);
+    const toggle = vscode.registeredCommands.get("commentComplexity.toggleLenses")!;
+
+    toggle();
+    expect(refreshed).toHaveBeenCalledTimes(1);
+    expect(await lensProvider.provideCodeLenses(kotlin() as never)).toEqual([]);
+    expect(
+      await hoverProvider.provideHover(kotlin() as never, new vscode.Position(0, 5) as never),
+    ).toBeDefined();
+    toggle();
+    expect(await lensProvider.provideCodeLenses(kotlin() as never)).toHaveLength(1);
+  });
+
+  describe("file report", () => {
+    const twoComments = {
+      ...kotlin(),
+      getText: () =>
+        [
+          "// Plain words here.",
+          "val x = 1",
+          "// Idempotent SQS reconciliation never retries unless the lease wasn't renewed.",
+          "val y = 2",
+        ].join("\n"),
+    };
+
+    it("lists the file's comments by score and jumps to the picked one", async () => {
+      start();
+      vscode.window.activeTextEditor = { document: twoComments, viewColumn: 2 };
+      vscode.window.showQuickPick.mockImplementationOnce(async (items) => items[0]);
+      await report();
+
+      const [items, options] = vscode.window.showQuickPick.mock.calls[0]!;
+      const labels = (items as { label: string }[]).map(({ label }) => label.replace(/^\S+ +/, ""));
+      expect(labels).toEqual([
+        "Idempotent SQS reconciliation never retries unless the lease wasn't renewed.",
+        "Plain words here.",
+      ]);
+      expect(options).toMatchObject({ title: "Comment complexity: a.kt" });
+      expect(vscode.window.showTextDocument).toHaveBeenCalledWith(twoComments, {
+        selection: new vscode.Range(new vscode.Position(2, 0), new vscode.Position(2, 0)),
+        viewColumn: 2,
+      });
+    });
+
+    it("does nothing when the pick is dismissed", async () => {
+      start();
+      vscode.window.activeTextEditor = { document: twoComments };
+      await report();
+      expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
+      expect(vscode.window.showTextDocument).not.toHaveBeenCalled();
+    });
+
+    it("jumps without a view column too", async () => {
+      start();
+      vscode.window.activeTextEditor = { document: twoComments };
+      vscode.window.showQuickPick.mockImplementationOnce(async (items) => items[1]);
+      await report();
+      expect(vscode.window.showTextDocument).toHaveBeenCalledWith(twoComments, {
+        selection: new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 0)),
+      });
+    });
+
+    it.each([
+      ["no editor is open", undefined, "Open a file to see its comment complexity."],
+      [
+        "the language is off",
+        { document: { ...kotlin(), languageId: "plaintext" } },
+        "Comment complexity is off for plaintext (see the commentComplexity settings).",
+      ],
+      [
+        "there is nothing to score",
+        { document: { ...kotlin(), getText: () => "val x = 1" } },
+        "No comments to score in this file.",
+      ],
+    ])("says so when %s", async (_, editor, message) => {
+      start();
+      if (editor?.document.languageId === "plaintext") {
+        configure({ "commentComplexity.languages": ["kotlin"] });
+      }
+      vscode.window.activeTextEditor = editor;
+      await report();
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(message);
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
   });
 
   it("stops listening when its subscriptions are disposed", () => {

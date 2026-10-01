@@ -139,4 +139,72 @@ suite("Extension", () => {
       await configure({ diagnostics: undefined, threshold: undefined, showOnlyAbove: undefined });
     }
   });
+
+  test("toggles lenses and jumps to the most complex comment from the file report", async () => {
+    await activate();
+    const document = await vscode.workspace.openTextDocument({
+      language: "typescript",
+      content: [
+        "// Plain words here.",
+        "const x = 1;",
+        "// Idempotent SQS reconciliation never retries unless the lease wasn't renewed.",
+        "const y = 2;",
+        "",
+      ].join("\n"),
+    });
+    const editor = await vscode.window.showTextDocument(document);
+    const lenses = () =>
+      vscode.commands.executeCommand<vscode.CodeLens[]>(
+        "vscode.executeCodeLensProvider",
+        document.uri,
+      );
+    await waitFor(async () => ((await lenses()).length === 2 ? true : undefined));
+
+    await vscode.commands.executeCommand("commentComplexity.toggleLenses");
+    assert.deepStrictEqual(await lenses(), []);
+    await vscode.commands.executeCommand("commentComplexity.toggleLenses");
+    assert.strictEqual((await lenses()).length, 2);
+
+    // The report opens a quick pick; accept its first entry as a user would.
+    // It may not be open yet, so keep accepting until the command finishes.
+    let done = false;
+    const reported = vscode.commands
+      .executeCommand("commentComplexity.fileReport")
+      .then(() => (done = true));
+    await waitFor(async () => {
+      await vscode.commands.executeCommand("workbench.action.acceptSelectedQuickOpenItem");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return done ? true : undefined;
+    });
+    await reported;
+    const active = await waitFor(() =>
+      vscode.window.activeTextEditor?.selection.active.line === 2
+        ? vscode.window.activeTextEditor
+        : undefined,
+    );
+    assert.strictEqual(active.document, editor.document);
+  });
+
+  test("reports a file opened a moment ago, once it is parsed", async () => {
+    await activate();
+    const document = await vscode.workspace.openTextDocument({
+      language: "rust",
+      content:
+        "// Idempotent SQS reconciliation never retries unless the lease wasn't renewed.\nfn main() {}\n",
+    });
+    await vscode.window.showTextDocument(document);
+    // No waiting for lenses: the report itself must wait for the tree.
+    let done = false;
+    const reported = vscode.commands
+      .executeCommand("commentComplexity.fileReport")
+      .then(() => (done = true));
+    await waitFor(async () => {
+      await vscode.commands.executeCommand("workbench.action.acceptSelectedQuickOpenItem");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return done ? true : undefined;
+    });
+    await reported;
+    assert.strictEqual(vscode.window.activeTextEditor?.selection.active.character, 0);
+    assert.strictEqual(vscode.window.activeTextEditor?.selection.active.line, 0);
+  });
 });
