@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Comment } from "../../extract/comments";
 import type { ScoredComment } from "../../score/analyzer";
 import { type Contribution, type MetricName, composite } from "../../score/composite";
-import { METRICS, hoverMarkdown, lensTitle } from "../../ui/present";
+import { METRICS, diagnosticMessage, hoverMarkdown, lensTitle } from "../../ui/present";
 import { PRIOR_WEIGHTS } from "../../score/calibration";
 import { results } from "./metricResults";
 
@@ -130,7 +130,21 @@ describe("hoverMarkdown", () => {
     expect(markdown).toContain(
       '- Restates the name "getUser": tells the reader nothing new (not in the score)',
     );
-    expect(markdown).toContain("_Readability formulas count from 20 words; this comment has 5._");
+    expect(markdown).toContain("_Readability formulas skipped: 5 words is too short for them._");
     expect(markdown).toContain("_Approximate: no grammar for this language");
+  });
+});
+
+describe("diagnosticMessage", () => {
+  it("gives the score, its label and the reasons", () => {
+    expect(
+      diagnosticMessage(
+        scored({
+          undefinedAcronyms: { value: 2, reason: "Undefined acronyms: SQS, DLQ" },
+          negationCount: { value: 3, reason: "3 negations" },
+        }),
+      ),
+    ).toBe("Comment complexity 2.6 (easy): Undefined acronyms: SQS, DLQ; 3 negations");
+    expect(diagnosticMessage(scored())).toBe("Comment complexity 0.0 (easy)");
   });
 });

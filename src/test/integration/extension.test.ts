@@ -25,6 +25,14 @@ async function waitFor<T>(
   }
 }
 
+/** Changes `commentComplexity.*` user settings; `undefined` resets one. */
+async function configure(values: Record<string, unknown>): Promise<void> {
+  const configuration = vscode.workspace.getConfiguration("commentComplexity");
+  for (const [setting, value] of Object.entries(values)) {
+    await configuration.update(setting, value, vscode.ConfigurationTarget.Global);
+  }
+}
+
 suite("Extension", () => {
   test("activates", async () => {
     await activate();
@@ -96,5 +104,39 @@ suite("Extension", () => {
       .join("\n");
     assert.match(markdown, /\*\*Comment complexity \d+\.\d \/ 10\*\*/);
     assert.match(markdown, /\| Clauses \|/);
+  });
+
+  test("applies settings live: diagnostics and lenses above the threshold", async () => {
+    await activate();
+    const document = await vscode.workspace.openTextDocument({
+      language: "typescript",
+      content: "// Retries the upload when the network drops.\nconst retries = 3;\n",
+    });
+    const lenses = () =>
+      vscode.commands.executeCommand<vscode.CodeLens[]>(
+        "vscode.executeCodeLensProvider",
+        document.uri,
+      );
+    try {
+      await waitFor(async () => ((await lenses()).length > 0 ? true : undefined));
+      assert.deepStrictEqual(vscode.languages.getDiagnostics(document.uri), []);
+
+      await configure({ diagnostics: true, threshold: 0 });
+      const [diagnostic] = await waitFor(() => {
+        const found = vscode.languages.getDiagnostics(document.uri);
+        return found.length > 0 ? found : undefined;
+      });
+      assert.strictEqual(diagnostic?.severity, vscode.DiagnosticSeverity.Information);
+      assert.strictEqual(diagnostic.source, "Comment Complexity");
+
+      await configure({ threshold: 10, showOnlyAbove: true });
+      await waitFor(async () =>
+        (await lenses()).length === 0 && vscode.languages.getDiagnostics(document.uri).length === 0
+          ? true
+          : undefined,
+      );
+    } finally {
+      await configure({ diagnostics: undefined, threshold: undefined, showOnlyAbove: undefined });
+    }
   });
 });

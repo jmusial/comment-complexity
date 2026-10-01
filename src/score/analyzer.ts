@@ -6,7 +6,8 @@ import type { SourceDocument } from "../extract/treeSitter";
 import { type Redundancy, redundancy } from "../metrics/redundancy";
 import type { ZipfLookup } from "../metrics/zipf";
 import { dialectFor, normalize } from "../normalize/clean";
-import { type Score, composite, measure } from "./composite";
+import type { Settings } from "../settings";
+import { DEFAULT_BANDS, type Score, composite, measure } from "./composite";
 
 /** A comment with its score, ready to show. */
 export interface ScoredComment {
@@ -29,6 +30,8 @@ export interface AnalyzerSources {
   readonly vocabulary: () => Promise<ReadonlySet<string>>;
   /** Called once, on the first comment scored. */
   readonly zipf: () => ZipfLookup;
+  /** Read per analysis; call `clear` when they change. */
+  readonly settings: () => Pick<Settings, "weights" | "ramp" | "acronyms">;
 }
 
 /**
@@ -69,6 +72,11 @@ export class CommentAnalyzer {
     this.cache.delete(key);
   }
 
+  /** Drops every cached result, as when the settings change. */
+  clear(): void {
+    this.cache.clear();
+  }
+
   private comments(key: string, document: SourceDocument): Comment[] | undefined {
     const spec = LANGUAGES.get(document.languageId);
     if (spec !== undefined && this.sources.hasGrammar(document.languageId)) {
@@ -83,7 +91,10 @@ export class CommentAnalyzer {
     if (comments.length === 0) {
       return [];
     }
-    const vocabulary = await this.sources.vocabulary();
+    const { weights, ramp, acronyms } = this.sources.settings();
+    const workspace = await this.sources.vocabulary();
+    // Whitelisted acronyms are known terms: neither undefined nor rare.
+    const vocabulary = acronyms.size === 0 ? workspace : new Set([...workspace, ...acronyms]);
     this.zipf ??= this.sources.zipf();
     const scored: ScoredComment[] = [];
     for (const comment of comments) {
@@ -105,7 +116,7 @@ export class CommentAnalyzer {
         comment,
         text,
         words: results.words,
-        score: composite(results),
+        score: composite(results, weights, DEFAULT_BANDS, ramp),
         redundancy: redundancy(text, symbol),
       });
     }

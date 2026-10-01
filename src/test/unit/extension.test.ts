@@ -23,7 +23,26 @@ afterEach(() => {
     subscription.dispose();
   }
   vi.resetAllMocks();
+  for (const setting of Object.keys(vscode.configuration)) {
+    delete vscode.configuration[setting];
+  }
+  vscode.workspace.textDocuments.length = 0;
 });
+
+/** A Kotlin document: scanned by the fallback, so it is scored without a grammar. */
+const kotlin = (path = "/ws/a.kt") => ({
+  uri: uri(path),
+  languageId: "kotlin",
+  version: 1,
+  isClosed: false,
+  getText: () => "// Retries the upload when the network drops.\nval x = 1",
+});
+
+/** Changes settings the way the user would, then tells the extension. */
+function configure(values: Record<string, unknown>, section = "commentComplexity") {
+  Object.assign(vscode.configuration, values);
+  vscode.events.configuration.fire({ affectsConfiguration: (name) => name === section });
+}
 
 describe("activate", () => {
   it("wires document events to the syntax trees and logs failed parses", async () => {
@@ -127,6 +146,80 @@ describe("activate", () => {
     expect(await lensProvider.provideCodeLenses(document as never)).toEqual([]);
     vscode.events.close.fire(document);
     expect(forget).toHaveBeenCalledWith("file:///ws/b.ts");
+  });
+
+  it("applies settings live", async () => {
+    const { settings } = start();
+    const lensProvider = vscode.languages.registerCodeLensProvider.mock
+      .calls[0]![1] as ComplexityLensProvider;
+    const hoverProvider = vscode.languages.registerHoverProvider.mock
+      .calls[0]![1] as ComplexityHoverProvider;
+    const refreshed = vi.fn<() => void>();
+    lensProvider.onDidChangeCodeLenses(refreshed);
+    const document = kotlin() as never;
+    expect(await lensProvider.provideCodeLenses(document)).toHaveLength(1);
+
+    // Other extensions' settings change nothing.
+    configure({ "commentComplexity.threshold": 10 }, "editor");
+    expect(refreshed).not.toHaveBeenCalled();
+    expect(settings().threshold).toBe(5);
+
+    configure({ "commentComplexity.showOnlyAbove": true });
+    expect(refreshed).toHaveBeenCalledTimes(1);
+    expect(settings()).toMatchObject({ threshold: 10, showOnlyAbove: true });
+    expect(await lensProvider.provideCodeLenses(document)).toEqual([]);
+
+    configure({ "commentComplexity.threshold": 0 });
+    expect(await lensProvider.provideCodeLenses(document)).toHaveLength(1);
+
+    configure({ "commentComplexity.languages": ["typescript"] });
+    expect(await lensProvider.provideCodeLenses(document)).toEqual([]);
+    configure({ "commentComplexity.languages": [], "commentComplexity.enabled": false });
+    expect(await lensProvider.provideCodeLenses(document)).toEqual([]);
+    expect(await hoverProvider.provideHover(document, new vscode.Position(0, 5) as never)).toBe(
+      undefined,
+    );
+  });
+
+  it("reports complex comments as Information diagnostics once turned on", async () => {
+    const { analyzer } = start();
+    const document = kotlin();
+    const key = "file:///ws/a.kt";
+    vscode.workspace.textDocuments.push(document);
+
+    // Off by default: changes clear rather than report.
+    vscode.events.change.fire({ document, contentChanges: [{}] });
+    await vi.waitFor(() => expect(vscode.diagnostics.has(key)).toBe(false));
+
+    configure({ "commentComplexity.diagnostics": true, "commentComplexity.threshold": 0 });
+    await vi.waitFor(() => expect(vscode.diagnostics.get(key)).toHaveLength(1));
+    const [diagnostic] = vscode.diagnostics.get(key)!;
+    expect(diagnostic).toMatchObject({
+      severity: vscode.DiagnosticSeverity.Information,
+      source: "Comment Complexity",
+    });
+    expect(diagnostic!.message).toMatch(/^Comment complexity \d+\.\d \(\w+\)/);
+
+    // Above the threshold only.
+    configure({ "commentComplexity.threshold": 10 });
+    await vi.waitFor(() => expect(vscode.diagnostics.get(key)).toEqual([]));
+
+    // A document closed while it was being scored keeps nothing.
+    configure({ "commentComplexity.threshold": 0 });
+    document.isClosed = true;
+    vscode.events.close.fire(document);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(vscode.diagnostics.has(key)).toBe(false);
+
+    // Failures are logged.
+    vi.spyOn(analyzer, "analyze").mockRejectedValue(new Error("no vocabulary"));
+    vscode.events.change.fire({ document: kotlin("/ws/b.kt"), contentChanges: [{}] });
+    await vi.waitFor(() =>
+      expect(vscode.log.error).toHaveBeenCalledWith(
+        "Failed to score file:///ws/b.kt",
+        expect.anything(),
+      ),
+    );
   });
 
   it("stops listening when its subscriptions are disposed", () => {

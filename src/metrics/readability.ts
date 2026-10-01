@@ -129,13 +129,17 @@ export const READABILITY_METRICS = {
   averageSentenceLength,
 } as const satisfies Record<string, ReadabilityMetric>;
 
-/** Below this many words the formulas are noise, so they get no weight. */
-export const RAMP_START = 20;
+/** Word counts over which the readability formulas fade in. */
+export interface Ramp {
+  /** Below this many words the formulas are noise, so they get no weight. */
+  readonly start: number;
+  /** From this many words on the formulas count fully. */
+  readonly end: number;
+}
 
-/** From this many words on the formulas count fully. */
-export const RAMP_END = 40;
+export const DEFAULT_RAMP: Ramp = { start: 20, end: 40 };
 
-/** How much the readability formulas count: 0 below 20 words, rising linearly to 1 at 40. */
-export function readabilityWeight(words: number): number {
-  return Math.min(1, Math.max(0, (words - RAMP_START) / (RAMP_END - RAMP_START)));
+/** How much the readability formulas count: 0 below `start` words, rising linearly to 1 at `end`. */
+export function readabilityWeight(words: number, { start, end }: Ramp = DEFAULT_RAMP): number {
+  return Math.min(1, Math.max(0, (words - start) / (end - start)));
 }

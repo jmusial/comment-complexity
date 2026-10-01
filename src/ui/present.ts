@@ -1,4 +1,3 @@
-import { RAMP_START } from "../metrics/readability";
 import type { ScoredComment } from "../score/analyzer";
 import type { Contribution, MetricName } from "../score/composite";
 
@@ -145,8 +144,8 @@ export function hoverMarkdown(scored: ScoredComment): string {
     );
   }
   const notes: string[] = [];
-  if (words < RAMP_START) {
-    notes.push(`Readability formulas count from ${RAMP_START} words; this comment has ${words}.`);
+  if (score.readability === 0) {
+    notes.push(`Readability formulas skipped: ${words} words is too short for them.`);
   }
   if (comment.approx) {
     notes.push("Approximate: no grammar for this language, so comments were found by pattern.");
@@ -155,4 +154,10 @@ export function hoverMarkdown(scored: ScoredComment): string {
     lines.push("", ...notes.map((note) => `_${note}_`));
   }
   return lines.join("\n");
+}
+
+/** The diagnostic for a comment at or above the threshold, like `Comment complexity 7.2 (hard): …`. */
+export function diagnosticMessage({ score }: ScoredComment): string {
+  const head = `Comment complexity ${score.score.toFixed(1)} (${score.label})`;
+  return score.reasons.length === 0 ? head : `${head}: ${score.reasons.join("; ")}`;
 }

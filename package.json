@@ -58,7 +58,134 @@
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"
   },
-  "contributes": {},
+  "contributes": {
+    "configuration": {
+      "title": "Comment Complexity",
+      "properties": {
+        "commentComplexity.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Score comments and show the lens and hover."
+        },
+        "commentComplexity.languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Language ids to score, like `typescript`. Empty scores every supported language."
+        },
+        "commentComplexity.threshold": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 10,
+          "markdownDescription": "Score (0–10) from which a comment counts as complex, for `#commentComplexity.showOnlyAbove#` and `#commentComplexity.diagnostics#`."
+        },
+        "commentComplexity.showOnlyAbove": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show lenses only on comments scoring at or above `#commentComplexity.threshold#`."
+        },
+        "commentComplexity.diagnostics": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Report comments scoring at or above `#commentComplexity.threshold#` in the Problems panel, as Information."
+        },
+        "commentComplexity.weights": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "How much each metric counts, overriding the calibrated weights. `0` turns a metric off.",
+          "properties": {
+            "nounStack": {
+              "type": "number",
+              "minimum": 0
+            },
+            "clauseCount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "meanZipf": {
+              "type": "number",
+              "minimum": 0
+            },
+            "minZipf": {
+              "type": "number",
+              "minimum": 0
+            },
+            "lexicalDensity": {
+              "type": "number",
+              "minimum": 0
+            },
+            "negationCount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "danglingReference": {
+              "type": "number",
+              "minimum": 0
+            },
+            "undefinedAcronyms": {
+              "type": "number",
+              "minimum": 0
+            },
+            "commentLength": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fleschKincaidGrade": {
+              "type": "number",
+              "minimum": 0
+            },
+            "gunningFog": {
+              "type": "number",
+              "minimum": 0
+            },
+            "colemanLiau": {
+              "type": "number",
+              "minimum": 0
+            },
+            "averageSentenceLength": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "commentComplexity.acronymWhitelist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Acronyms your readers know, like `SQS`; they are not flagged as undefined or rare."
+        },
+        "commentComplexity.readabilityRamp": {
+          "type": "object",
+          "default": {
+            "start": 20,
+            "end": 40
+          },
+          "markdownDescription": "Readability formulas count from `start` words and fully from `end` words; they are noise on short comments.",
+          "properties": {
+            "start": {
+              "type": "number",
+              "minimum": 0
+            },
+            "end": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  },
   "activationEvents": [
     "onLanguage:c",
     "onLanguage:cpp",

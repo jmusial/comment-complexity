@@ -5,7 +5,12 @@ import { LANGUAGES } from "./extract/languages";
 import { DocumentTrees, GrammarLoader } from "./extract/treeSitter";
 import { loadZipf } from "./metrics/zipf";
 import { CommentAnalyzer } from "./score/analyzer";
-import { ComplexityHoverProvider, ComplexityLensProvider } from "./ui/providers";
+import { SECTION, type Settings, parseSettings } from "./settings";
+import {
+  ComplexityDiagnostics,
+  ComplexityHoverProvider,
+  ComplexityLensProvider,
+} from "./ui/providers";
 import { WorkspaceVocabulary } from "./vocab/workspace";
 
 /** Returned from `activate` so integration tests can inspect extension state. */
@@ -13,10 +18,17 @@ export interface ExtensionApi {
   readonly trees: DocumentTrees;
   readonly vocabulary: WorkspaceVocabulary<vscode.Uri>;
   readonly analyzer: CommentAnalyzer;
+  /** The settings in effect. */
+  settings(): Settings;
 }
 
 function key(document: vscode.TextDocument): string {
   return document.uri.toString();
+}
+
+function readSettings(): Settings {
+  const configuration = vscode.workspace.getConfiguration(SECTION);
+  return parseSettings((setting) => configuration.get(setting));
 }
 
 export function activate(context: vscode.ExtensionContext): ExtensionApi {
@@ -49,20 +61,33 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     (uri, error) => log.error(`Failed to read identifiers from ${uri}`, error),
   );
 
+  let settings = readSettings();
+  const current = () => settings;
   const analyzer = new CommentAnalyzer({
     tree: (documentKey) => trees.get(documentKey),
     hasGrammar: (languageId) => loader.supports(languageId),
     vocabulary: () => vocabulary.words(),
     zipf: () => loadZipf(vscode.Uri.joinPath(context.extensionUri, "data", "zipf-en.json").fsPath),
+    settings: current,
   });
-  const lenses = new ComplexityLensProvider(analyzer);
+  const lenses = new ComplexityLensProvider(analyzer, current);
+  const collection = vscode.languages.createDiagnosticCollection("comment-complexity");
+  const diagnostics = new ComplexityDiagnostics(analyzer, current, collection);
+  const diagnose = (document: vscode.TextDocument) => {
+    diagnostics
+      .update(document)
+      .catch((error: unknown) => log.error(`Failed to score ${key(document)}`, error));
+  };
   const selector = [...LANGUAGES.keys(), ...FALLBACK_SYNTAXES.keys()].map((language) => ({
     language,
   }));
 
   const open = (document: vscode.TextDocument) => {
     // Lenses asked for before the tree was ready came back empty.
-    void trees.open(key(document), document).then(() => lenses.refresh());
+    void trees.open(key(document), document).then(() => {
+      lenses.refresh();
+      diagnose(document);
+    });
   };
 
   // A language mode switch arrives as close + open, so the grammar is swapped too.
@@ -70,23 +95,38 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     { dispose: () => trees.dispose() },
     vocabulary,
     lenses,
+    collection,
     vscode.languages.registerCodeLensProvider(selector, lenses),
-    vscode.languages.registerHoverProvider(selector, new ComplexityHoverProvider(analyzer)),
+    vscode.languages.registerHoverProvider(
+      selector,
+      new ComplexityHoverProvider(analyzer, current),
+    ),
+    // Settings apply live: rescore with them and redraw everything shown.
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(SECTION)) {
+        settings = readSettings();
+        analyzer.clear();
+        lenses.refresh();
+        vscode.workspace.textDocuments.forEach(diagnose);
+      }
+    }),
     vscode.workspace.onDidOpenTextDocument(open),
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.contentChanges.length > 0) {
         trees.update(key(event.document), event.document, event.contentChanges);
+        diagnose(event.document);
       }
     }),
     vscode.workspace.onDidCloseTextDocument((document) => {
       trees.close(key(document));
       analyzer.forget(key(document));
+      diagnostics.delete(document);
     }),
   );
   vscode.workspace.textDocuments.forEach(open);
 
   log.info("Comment Complexity activated");
-  return { trees, vocabulary, analyzer };
+  return { trees, vocabulary, analyzer, settings: current };
 }
 
 export function deactivate(): void {}

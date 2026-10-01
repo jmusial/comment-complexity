@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DocumentTrees, GrammarLoader, type SourceDocument } from "../../extract/treeSitter";
 import { type ZipfLookup, loadZipf } from "../../metrics/zipf";
 import { type AnalyzerSources, CommentAnalyzer } from "../../score/analyzer";
+import { DEFAULT_WEIGHTS, type Weights } from "../../score/composite";
+import { DEFAULT_SETTINGS, type Settings } from "../../settings";
 
 const wasmDir = path.resolve("node_modules/@vscode/tree-sitter-wasm/wasm");
 const loader = new GrammarLoader(wasmDir, wasmDir);
@@ -25,6 +27,7 @@ function analyzer(overrides: Partial<AnalyzerSources> = {}) {
     hasGrammar: (languageId: string) => loader.supports(languageId),
     vocabulary: vi.fn<() => Promise<ReadonlySet<string>>>(async () => new Set()),
     zipf: vi.fn<() => ZipfLookup>(() => table),
+    settings: () => DEFAULT_SETTINGS,
     ...overrides,
   };
   return { analyzer: new CommentAnalyzer(sources), sources };
@@ -134,5 +137,57 @@ describe("CommentAnalyzer", () => {
       return scored!.score.contributions.find(({ metric }) => metric === "minZipf")!.value;
     };
     expect(await rarest(["idempotency", "shard"])).toBeGreaterThan(await rarest([]));
+  });
+
+  describe("with settings", () => {
+    const LONG = `// ${"The upload is retried when the network drops for a while. ".repeat(3)}\nconst a = 1;`;
+
+    async function scoreWith(settings: Partial<Settings>, source = LONG) {
+      const doc = document(source);
+      await trees.open("s.ts", doc);
+      const { analyzer: subject } = analyzer({
+        settings: () => ({ ...DEFAULT_SETTINGS, ...settings }),
+      });
+      const [scored] = await subject.analyze("s.ts", doc);
+      return scored!.score;
+    }
+
+    it("uses the configured weights", async () => {
+      const onlyLength = Object.fromEntries(
+        Object.entries(DEFAULT_WEIGHTS).map(([metric, config]) => [
+          metric,
+          { ...config, weight: metric === "commentLength" ? 1 : 0 },
+        ]),
+      ) as Weights;
+      const score = await scoreWith({ weights: onlyLength });
+      expect(
+        score.contributions.filter(({ points }) => points > 0).map(({ metric }) => metric),
+      ).toEqual(["commentLength"]);
+    });
+
+    it("uses the configured readability ramp", async () => {
+      // 33 words: past the default ramp's middle, just into a later one.
+      expect((await scoreWith({})).readability).toBeCloseTo(0.65);
+      expect((await scoreWith({ ramp: { start: 30, end: 60 } })).readability).toBeCloseTo(0.1);
+    });
+
+    it("treats whitelisted acronyms as known", async () => {
+      const source = "// Retries SQS calls on failure.\nconst a = 1;";
+      expect((await scoreWith({}, source)).reasons).toContain("Undefined acronym: SQS");
+      const known = await scoreWith({ acronyms: new Set(["sqs"]) }, source);
+      expect(known.reasons).not.toContain("Undefined acronym: SQS");
+    });
+
+    it("rescores after clear", async () => {
+      let settings: Settings = DEFAULT_SETTINGS;
+      const { analyzer: subject } = analyzer({ settings: () => settings });
+      const doc = document(LONG);
+      await trees.open("t.ts", doc);
+      const before = await subject.analyze("t.ts", doc);
+      settings = { ...DEFAULT_SETTINGS, ramp: { start: 30, end: 60 } };
+      expect(await subject.analyze("t.ts", doc)).toBe(before);
+      subject.clear();
+      expect((await subject.analyze("t.ts", doc))[0]!.score.readability).toBeCloseTo(0.1);
+    });
   });
 });
