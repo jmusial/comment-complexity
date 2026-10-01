@@ -109,6 +109,8 @@ export class DocumentTrees {
   private readonly entries = new Map<string, Entry>();
   /** Token per document whose grammar is still loading; replaced or dropped to cancel that open. */
   private readonly opening = new Map<string, object>();
+  /** The open in progress per document, for `whenParsed`. */
+  private readonly pending = new Map<string, Promise<Tree | undefined>>();
 
   constructor(
     private readonly loader: GrammarLoader,
@@ -127,10 +129,25 @@ export class DocumentTrees {
     this.close(key);
     const token = {};
     this.opening.set(key, token);
-    return this.parseFresh(key, document, token).catch((error: unknown) => {
+    const parsed = this.parseFresh(key, document, token).catch((error: unknown) => {
       this.onError?.(key, error);
       return undefined;
     });
+    this.pending.set(key, parsed);
+    void parsed.then(() => {
+      if (this.pending.get(key) === parsed) {
+        this.pending.delete(key);
+      }
+    });
+    return parsed;
+  }
+
+  /**
+   * The document's tree once any open in progress has finished; `undefined` if it is not parsed,
+   * as for unsupported languages. Never rejects.
+   */
+  whenParsed(key: string): Promise<Tree | undefined> {
+    return this.pending.get(key) ?? Promise.resolve(this.get(key));
   }
 
   /**
@@ -166,6 +183,7 @@ export class DocumentTrees {
 
   close(key: string): void {
     this.opening.delete(key);
+    this.pending.delete(key);
     const entry = this.entries.get(key);
     if (entry) {
       entry.tree.delete();

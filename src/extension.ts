@@ -97,7 +97,11 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     vocabulary,
     lenses,
     collection,
-    ...registerCommands(analyzer, lenses, current),
+    ...registerCommands(
+      { analyzer, parsed: (documentKey) => trees.whenParsed(documentKey) },
+      lenses,
+      current,
+    ),
     vscode.languages.registerCodeLensProvider(selector, lenses),
     vscode.languages.registerHoverProvider(
       selector,

@@ -157,6 +157,33 @@ describe("DocumentTrees", () => {
     expect(trees.get("a")).toBeUndefined();
   });
 
+  it("waits for an open in progress, then answers from the cache", async () => {
+    const trees = new DocumentTrees(loader);
+    const doc = new FakeDocument("let x = 1;\n", "rust");
+    await expect(trees.whenParsed("a")).resolves.toBeUndefined();
+
+    const opening = trees.open("a", doc);
+    const waited = trees.whenParsed("a");
+    expect(trees.get("a")).toBeUndefined();
+    const tree = await waited;
+    expect(tree).toBe(await opening);
+    await expect(trees.whenParsed("a")).resolves.toBe(tree);
+
+    // A reopen is waited for, not the open it replaced.
+    const first = trees.open("b", doc);
+    const second = trees.open("b", doc);
+    await first;
+    expect(await trees.whenParsed("b")).toBe(await second);
+
+    // Closing mid-parse ends the wait without a tree.
+    const closing = trees.open("c", doc);
+    trees.close("c");
+    await expect(trees.whenParsed("c")).resolves.toBeUndefined();
+    await closing;
+
+    trees.dispose();
+  });
+
   it("ignores unsupported languages", async () => {
     const trees = new DocumentTrees(loader);
     const doc = new FakeDocument("# title\n", "markdown");

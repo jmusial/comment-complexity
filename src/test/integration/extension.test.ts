@@ -184,4 +184,27 @@ suite("Extension", () => {
     );
     assert.strictEqual(active.document, editor.document);
   });
+
+  test("reports a file opened a moment ago, once it is parsed", async () => {
+    await activate();
+    const document = await vscode.workspace.openTextDocument({
+      language: "rust",
+      content:
+        "// Idempotent SQS reconciliation never retries unless the lease wasn't renewed.\nfn main() {}\n",
+    });
+    await vscode.window.showTextDocument(document);
+    // No waiting for lenses: the report itself must wait for the tree.
+    let done = false;
+    const reported = vscode.commands
+      .executeCommand("commentComplexity.fileReport")
+      .then(() => (done = true));
+    await waitFor(async () => {
+      await vscode.commands.executeCommand("workbench.action.acceptSelectedQuickOpenItem");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return done ? true : undefined;
+    });
+    await reported;
+    assert.strictEqual(vscode.window.activeTextEditor?.selection.active.character, 0);
+    assert.strictEqual(vscode.window.activeTextEditor?.selection.active.line, 0);
+  });
 });

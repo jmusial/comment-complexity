@@ -7,8 +7,18 @@ import type { ComplexityLensProvider } from "./providers";
 export const TOGGLE_LENSES = "commentComplexity.toggleLenses";
 export const FILE_REPORT = "commentComplexity.fileReport";
 
+/** What the report needs: scored comments, once the document's syntax tree is ready. */
+export interface ReportSources {
+  readonly analyzer: CommentAnalyzer;
+  /** Settles when a parse in progress for the document key has finished. */
+  readonly parsed: (key: string) => Promise<unknown>;
+}
+
 /** Lists the active file's comments by score; choosing one moves the cursor to it. */
-export async function fileReport(analyzer: CommentAnalyzer, settings: Settings): Promise<void> {
+export async function fileReport(
+  { analyzer, parsed }: ReportSources,
+  settings: Settings,
+): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (editor === undefined) {
     void vscode.window.showInformationMessage("Open a file to see its comment complexity.");
@@ -21,7 +31,10 @@ export async function fileReport(analyzer: CommentAnalyzer, settings: Settings):
     );
     return;
   }
-  const items = reportItems(await analyzer.analyze(document.uri.toString(), document));
+  const key = document.uri.toString();
+  // Right after opening a file its tree may still be parsing, which would look like no comments.
+  await parsed(key);
+  const items = reportItems(await analyzer.analyze(key, document));
   if (items.length === 0) {
     void vscode.window.showInformationMessage("No comments to score in this file.");
     return;
@@ -46,12 +59,12 @@ export async function fileReport(analyzer: CommentAnalyzer, settings: Settings):
 }
 
 export function registerCommands(
-  analyzer: CommentAnalyzer,
+  sources: ReportSources,
   lenses: ComplexityLensProvider,
   settings: () => Settings,
 ): vscode.Disposable[] {
   return [
     vscode.commands.registerCommand(TOGGLE_LENSES, () => lenses.toggle()),
-    vscode.commands.registerCommand(FILE_REPORT, () => fileReport(analyzer, settings())),
+    vscode.commands.registerCommand(FILE_REPORT, () => fileReport(sources, settings())),
   ];
 }
