@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { activate, deactivate } from "../../extension";
+import { DIAGNOSTICS_DELAY_MS, activate, deactivate } from "../../extension";
 import { EXCLUDE, INCLUDE } from "../../vocab/workspace";
 // The same module `extension.ts` gets as `vscode` (see vitest.config.mts).
 import * as vscode from "./vscode.stub";
@@ -224,6 +224,30 @@ describe("activate", () => {
         expect.anything(),
       ),
     );
+  });
+
+  it("waits for typing to pause before recomputing diagnostics", async () => {
+    vi.useFakeTimers();
+    try {
+      start();
+      configure({ "commentComplexity.diagnostics": true, "commentComplexity.threshold": 0 });
+      const document = kotlin();
+      const key = "file:///ws/a.kt";
+      vscode.events.change.fire({ document, contentChanges: [{}] });
+      await vi.advanceTimersByTimeAsync(DIAGNOSTICS_DELAY_MS - 1);
+      expect(vscode.diagnostics.has(key)).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(vscode.diagnostics.get(key)).toHaveLength(1);
+
+      // Closing drops diagnostics still waiting for the pause.
+      const other = kotlin("/ws/b.kt");
+      vscode.events.change.fire({ document: other, contentChanges: [{}] });
+      vscode.events.close.fire(other);
+      await vi.advanceTimersByTimeAsync(DIAGNOSTICS_DELAY_MS);
+      expect(vscode.diagnostics.has("file:///ws/b.kt")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("toggles the lenses, leaving hovers", async () => {

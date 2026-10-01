@@ -34,7 +34,9 @@
     "test:integration": "pnpm compile-tests && pnpm compile && vscode-test",
     "package": "vsce package --no-dependencies",
     "fmt:check": "oxfmt --check",
-    "calibrate": "esbuild scripts/calibrate.ts --bundle --platform=node --format=cjs --packages=external --outfile=out/calibrate.cjs --log-level=warning && node out/calibrate.cjs"
+    "calibrate": "esbuild scripts/calibrate.ts --bundle --platform=node --format=cjs --packages=external --outfile=out/calibrate.cjs --log-level=warning && node out/calibrate.cjs",
+    "test:perf": "vitest run --config vitest.perf.config.mts",
+    "smoke": "esbuild scripts/smoke.ts --bundle --platform=node --format=cjs --packages=external --outfile=out/smoke.cjs --log-level=warning && node out/smoke.cjs"
   },
   "dependencies": {
     "@vscode/tree-sitter-wasm": "^0.3.1",

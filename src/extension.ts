@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { Debouncer } from "./debounce";
 import { FALLBACK_SYNTAXES } from "./extract/fallback";
 import { LANGUAGES } from "./extract/languages";
 import { DocumentTrees, GrammarLoader } from "./extract/treeSitter";
@@ -26,6 +27,9 @@ export interface ExtensionApi {
 function key(document: vscode.TextDocument): string {
   return document.uri.toString();
 }
+
+/** How long typing must pause before diagnostics are recomputed. */
+export const DIAGNOSTICS_DELAY_MS = 300;
 
 function readSettings(): Settings {
   const configuration = vscode.workspace.getConfiguration(SECTION);
@@ -79,6 +83,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
       .update(document)
       .catch((error: unknown) => log.error(`Failed to score ${key(document)}`, error));
   };
+  const typing = new Debouncer(DIAGNOSTICS_DELAY_MS);
   const selector = [...LANGUAGES.keys(), ...FALLBACK_SYNTAXES.keys()].map((language) => ({
     language,
   }));
@@ -97,6 +102,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     vocabulary,
     lenses,
     collection,
+    typing,
     ...registerCommands(
       { analyzer, parsed: (documentKey) => trees.whenParsed(documentKey) },
       lenses,
@@ -120,12 +126,13 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.contentChanges.length > 0) {
         trees.update(key(event.document), event.document, event.contentChanges);
-        diagnose(event.document);
+        typing.schedule(key(event.document), () => diagnose(event.document));
       }
     }),
     vscode.workspace.onDidCloseTextDocument((document) => {
       trees.close(key(document));
       analyzer.forget(key(document));
+      typing.cancel(key(document));
       diagnostics.delete(document);
     }),
   );
