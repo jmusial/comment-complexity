@@ -84,7 +84,9 @@ async function main(): Promise<void> {
   const words = await vocabulary.words();
   const vocabularyMs = performance.now() - start;
 
-  const trees = new DocumentTrees(loader);
+  // DocumentTrees reports parse failures here rather than throwing.
+  const parseErrors = new Map<string, unknown>();
+  const trees = new DocumentTrees(loader, (file, error) => parseErrors.set(file, error));
   const zipf = loadZipf("data/zipf-en.json");
   const analyzer = new CommentAnalyzer({
     tree: (key) => trees.get(key),
@@ -117,7 +119,11 @@ async function main(): Promise<void> {
     const document = { languageId, version: 1, getText: () => text };
     const fileStart = performance.now();
     try {
-      await trees.open(file, document);
+      const tree = await trees.open(file, document);
+      // A grammar language without a tree was not scored at all; fallback languages need none.
+      if (tree === undefined && loader.supports(languageId)) {
+        throw parseErrors.get(file) ?? new Error("no syntax tree");
+      }
       const comments = await analyzer.analyze(file, document);
       results.push({
         file,
@@ -131,6 +137,7 @@ async function main(): Promise<void> {
     } finally {
       trees.close(file);
       analyzer.forget(file);
+      parseErrors.delete(file);
     }
     if ((i + 1) % 2_000 === 0) {
       console.error(`… ${i + 1} of ${files.length} files`);
