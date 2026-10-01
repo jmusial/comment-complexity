@@ -1,10 +1,12 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { DocumentTrees, GrammarLoader } from "./extract/treeSitter";
+import { WorkspaceVocabulary } from "./vocab/workspace";
 
-/** Returned from `activate` so integration tests can inspect parser state. */
+/** Returned from `activate` so integration tests can inspect extension state. */
 export interface ExtensionApi {
   readonly trees: DocumentTrees;
+  readonly vocabulary: WorkspaceVocabulary<vscode.Uri>;
 }
 
 function key(document: vscode.TextDocument): string {
@@ -19,9 +21,26 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
 
   // esbuild copies the runtime next to the bundle and grammars into dist/grammars.
   const dist = vscode.Uri.joinPath(context.extensionUri, "dist").fsPath;
-  const trees = new DocumentTrees(
-    new GrammarLoader(dist, path.join(dist, "grammars")),
-    (uri, error) => log.error(`Failed to parse ${uri}`, error),
+  const loader = new GrammarLoader(dist, path.join(dist, "grammars"));
+  const trees = new DocumentTrees(loader, (uri, error) =>
+    log.error(`Failed to parse ${uri}`, error),
+  );
+  // Built lazily, on the first comment that needs it.
+  const vocabulary = new WorkspaceVocabulary(
+    {
+      findFiles: (include, exclude, maxResults) =>
+        vscode.workspace.findFiles(include, exclude, maxResults),
+      readFile: (uri) => vscode.workspace.fs.readFile(uri),
+      relativePath: (uri) =>
+        vscode.workspace.getWorkspaceFolder(uri) === undefined
+          ? undefined
+          : vscode.workspace.asRelativePath(uri, false),
+      onDidSaveTextDocument: (listener) => vscode.workspace.onDidSaveTextDocument(listener),
+      onDidDeleteFiles: (listener) => vscode.workspace.onDidDeleteFiles(listener),
+      onDidRenameFiles: (listener) => vscode.workspace.onDidRenameFiles(listener),
+    },
+    loader,
+    (uri, error) => log.error(`Failed to read identifiers from ${uri}`, error),
   );
 
   const open = (document: vscode.TextDocument) => {
@@ -31,6 +50,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   // A language mode switch arrives as close + open, so the grammar is swapped too.
   context.subscriptions.push(
     { dispose: () => trees.dispose() },
+    vocabulary,
     vscode.workspace.onDidOpenTextDocument(open),
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.contentChanges.length > 0) {
@@ -42,7 +62,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   vscode.workspace.textDocuments.forEach(open);
 
   log.info("Comment Complexity activated");
-  return { trees };
+  return { trees, vocabulary };
 }
 
 export function deactivate(): void {}
