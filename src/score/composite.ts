@@ -1,6 +1,7 @@
 import { READABILITY_METRICS, readabilityWeight, textStats } from "../metrics/readability";
 import { type MetricContext, type MetricResult, SHORT_METRICS } from "../metrics/short";
 import { tokenize } from "../metrics/tokens";
+import calibrated from "./weights.json";
 
 /**
  * Combines the metrics into one 0–10 score. Each value becomes a difficulty from 0 to 1 by a ramp
@@ -22,21 +23,23 @@ export interface MetricWeight {
 
 export type Weights = Readonly<Record<MetricName, MetricWeight>>;
 
-/** Hand-picked until calibration (#14) fits them to labeled comments. */
-export const DEFAULT_WEIGHTS: Weights = {
-  nounStack: { weight: 1, easy: 2, hard: 5 },
-  clauseCount: { weight: 1, easy: 2, hard: 5 },
-  meanZipf: { weight: 1, easy: 5.5, hard: 3.5 },
-  minZipf: { weight: 1.5, easy: 4, hard: 2 },
-  lexicalDensity: { weight: 0.5, easy: 0.5, hard: 0.85 },
-  negationCount: { weight: 1, easy: 0, hard: 3 },
-  danglingReference: { weight: 1, easy: 0, hard: 2 },
-  undefinedAcronyms: { weight: 1.5, easy: 0, hard: 2 },
-  fleschKincaidGrade: { weight: 1, easy: 8, hard: 16 },
-  gunningFog: { weight: 1, easy: 8, hard: 16 },
-  colemanLiau: { weight: 1, easy: 8, hard: 16 },
-  averageSentenceLength: { weight: 1, easy: 15, hard: 30 },
-};
+/** Labels people give comments, easiest first. */
+export const LABELS = ["easy", "ok", "hard"] as const;
+export type Label = (typeof LABELS)[number];
+
+/** Scores from which a comment counts as ok, and as hard. */
+export interface Bands {
+  readonly ok: number;
+  readonly hard: number;
+}
+
+/** Fitted to labeled comments by `pnpm calibrate` (see `calibration.ts`). */
+export const DEFAULT_WEIGHTS: Weights = calibrated.weights;
+export const DEFAULT_BANDS: Bands = calibrated.bands;
+
+export function labelFor(score: number, bands: Bands): Label {
+  return score >= bands.hard ? "hard" : score >= bands.ok ? "ok" : "easy";
+}
 
 /** Said for metrics that matter but give no reason of their own. */
 const FALLBACK_REASONS: Partial<Record<MetricName, string>> = {
@@ -59,6 +62,8 @@ export interface Contribution {
 export interface Score {
   /** 0 (easy) to 10 (hard), one decimal. */
   readonly score: number;
+  /** The score's band; compared before rounding. */
+  readonly label: Label;
   /** Reasons of the metrics that added the most points, most first. */
   readonly reasons: readonly string[];
   /** Every metric, in `Weights` order. */
@@ -77,10 +82,14 @@ export function difficulty(value: number, { easy, hard }: MetricWeight): number 
   return Math.min(1, Math.max(0, (value - easy) / (hard - easy)));
 }
 
-const isShort = (metric: MetricName): metric is ShortMetricName => metric in SHORT_METRICS;
+export const isShort = (metric: MetricName): metric is ShortMetricName => metric in SHORT_METRICS;
 
 /** Scores metric results already computed. */
-export function composite(results: MetricResults, weights: Weights = DEFAULT_WEIGHTS): Score {
+export function composite(
+  results: MetricResults,
+  weights: Weights = DEFAULT_WEIGHTS,
+  bands: Bands = DEFAULT_BANDS,
+): Score {
   const blend = readabilityWeight(results.words);
   const scored = (Object.keys(weights) as MetricName[]).map((metric) => {
     const result = isShort(metric) ? results.short[metric] : results.readability[metric];
@@ -105,7 +114,12 @@ export function composite(results: MetricResults, weights: Weights = DEFAULT_WEI
     .toSorted((a, b) => b.points - a.points)
     .flatMap(({ reason }) => (reason === undefined ? [] : [reason]))
     .slice(0, TOP_REASONS);
-  return { score: Math.round(score * 10) / 10, reasons, contributions };
+  return {
+    score: Math.round(score * 10) / 10,
+    label: labelFor(score, bands),
+    reasons,
+    contributions,
+  };
 }
 
 /** Runs every metric over normalized comment text. */
@@ -128,6 +142,7 @@ export function scoreComment(
   text: string,
   context: MetricContext,
   weights: Weights = DEFAULT_WEIGHTS,
+  bands: Bands = DEFAULT_BANDS,
 ): Score {
-  return composite(measure(text, context), weights);
+  return composite(measure(text, context), weights, bands);
 }

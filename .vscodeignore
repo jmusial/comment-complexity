@@ -5,6 +5,7 @@ node_modules/**
 src/**
 scripts/**
 test-fixtures/**
+data/calibration/**
 .gitignore
 .yarnrc
 esbuild.js

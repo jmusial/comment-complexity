@@ -351,6 +351,15 @@ export const undefinedAcronyms: Metric = (tokens, context) => {
     : { value };
 };
 
+/** Words from which a comment is long enough to say so. */
+const LONG_COMMENT = 60;
+
+/** Words in the comment; every extra one is more to read, whatever the sentences look like. */
+export const commentLength: Metric = (tokens) => {
+  const value = tokens.filter(isWord).length;
+  return value >= LONG_COMMENT ? { value, reason: `Long comment: ${value} words` } : { value };
+};
+
 /** Every short-comment metric by name. */
 export const SHORT_METRICS = {
   nounStack,
@@ -361,4 +370,5 @@ export const SHORT_METRICS = {
   negationCount,
   danglingReference,
   undefinedAcronyms,
+  commentLength,
 } as const satisfies Record<string, Metric>;

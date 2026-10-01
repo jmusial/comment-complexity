@@ -24,7 +24,7 @@
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "check-types": "tsc --noEmit",
+    "check-types": "tsc --noEmit && tsc --noEmit -p scripts",
     "lint": "oxlint --deny-warnings",
     "fmt": "oxfmt",
     "test": "vitest run",
@@ -33,7 +33,8 @@
     "compile-tests": "tsc -p . --outDir out",
     "test:integration": "pnpm compile-tests && pnpm compile && vscode-test",
     "package": "vsce package --no-dependencies",
-    "fmt:check": "oxfmt --check"
+    "fmt:check": "oxfmt --check",
+    "calibrate": "esbuild scripts/calibrate.ts --bundle --platform=node --format=cjs --packages=external --outfile=out/calibrate.cjs --log-level=warning && node out/calibrate.cjs"
   },
   "dependencies": {
     "@vscode/tree-sitter-wasm": "^0.3.1",
