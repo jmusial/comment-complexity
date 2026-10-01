@@ -13,6 +13,7 @@ esbuild.js
 .oxfmtrc.json
 .npmrc
 vitest.config.mts
+vitest.perf.config.mts
 pnpm-workspace.yaml
 **/tsconfig.json
 **/*.map

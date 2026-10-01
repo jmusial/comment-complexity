@@ -46,12 +46,19 @@ export class ComplexityLensProvider implements vscode.CodeLensProvider {
     this.refresh();
   }
 
-  async provideCodeLenses(document: vscode.TextDocument): Promise<vscode.CodeLens[]> {
+  async provideCodeLenses(
+    document: vscode.TextDocument,
+    token?: vscode.CancellationToken,
+  ): Promise<vscode.CodeLens[]> {
     if (!this.visible) {
       return [];
     }
     const settings = this.settings();
     const comments = await analyze(this.analyzer, settings, document);
+    // Superseded, as by another edit: the analysis may be shared, so it ran on; its lenses need not.
+    if (token?.isCancellationRequested) {
+      return [];
+    }
     return comments.filter(settings.showOnlyAbove ? complex(settings) : () => true).map(
       (scored) =>
         new vscode.CodeLens(rangeOf(scored), {
@@ -77,8 +84,12 @@ export class ComplexityHoverProvider implements vscode.HoverProvider {
   async provideHover(
     document: vscode.TextDocument,
     position: vscode.Position,
+    token?: vscode.CancellationToken,
   ): Promise<vscode.Hover | undefined> {
     const comments = await analyze(this.analyzer, this.settings(), document);
+    if (token?.isCancellationRequested) {
+      return undefined;
+    }
     const scored = comments.find((comment) => rangeOf(comment).contains(position));
     return (
       scored && new vscode.Hover(new vscode.MarkdownString(hoverMarkdown(scored)), rangeOf(scored))

@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CommentAnalyzer, ScoredComment } from "../../score/analyzer";
 import { DEFAULT_SETTINGS, type Settings } from "../../settings";
-import { ComplexityDiagnostics } from "../../ui/providers";
+import {
+  ComplexityDiagnostics,
+  ComplexityHoverProvider,
+  ComplexityLensProvider,
+} from "../../ui/providers";
 import * as vscode from "./vscode.stub";
 
 describe("ComplexityDiagnostics", () => {
@@ -31,5 +35,34 @@ describe("ComplexityDiagnostics", () => {
     await pending;
     expect(set).not.toHaveBeenCalled();
     expect(vscode.diagnostics.size).toBe(0);
+  });
+});
+
+describe("cancellation", () => {
+  const scored = {
+    comment: { range: { start: { row: 0, column: 0 }, end: { row: 0, column: 30 } } },
+    text: "Retries the upload.",
+    words: 3,
+    score: { score: 1, label: "easy", reasons: [], contributions: [], readability: 0 },
+    redundancy: { redundant: false, overlap: 0 },
+  } as unknown as ScoredComment;
+  const analyzer = { analyze: async () => [scored] } as unknown as CommentAnalyzer;
+  const document = { uri: { toString: () => "file:///ws/a.ts" }, languageId: "typescript" };
+  const cancelled = { isCancellationRequested: true };
+  const live = { isCancellationRequested: false };
+
+  it("returns no lenses for a cancelled request", async () => {
+    const lenses = new ComplexityLensProvider(analyzer, () => DEFAULT_SETTINGS);
+    expect(await lenses.provideCodeLenses(document as never, cancelled as never)).toEqual([]);
+    expect(await lenses.provideCodeLenses(document as never, live as never)).toHaveLength(1);
+  });
+
+  it("returns no hover for a cancelled request", async () => {
+    const hover = new ComplexityHoverProvider(analyzer, () => DEFAULT_SETTINGS);
+    const position = new vscode.Position(0, 3) as never;
+    expect(await hover.provideHover(document as never, position, cancelled as never)).toBe(
+      undefined,
+    );
+    expect(await hover.provideHover(document as never, position, live as never)).toBeDefined();
   });
 });

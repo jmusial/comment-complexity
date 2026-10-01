@@ -1,11 +1,12 @@
 import type { Tree } from "@vscode/tree-sitter-wasm";
+import { DocumentCache, commentKey } from "../cache";
 import { type Comment, extractComments } from "../extract/comments";
 import { FALLBACK_SYNTAXES, scanComments } from "../extract/fallback";
 import { LANGUAGES } from "../extract/languages";
 import type { SourceDocument } from "../extract/treeSitter";
 import { type Redundancy, redundancy } from "../metrics/redundancy";
 import type { ZipfLookup } from "../metrics/zipf";
-import { dialectFor, normalize } from "../normalize/clean";
+import { type Dialect, dialectFor, normalize } from "../normalize/clean";
 import type { Settings } from "../settings";
 import { DEFAULT_BANDS, type Score, composite, measure } from "./composite";
 
@@ -30,9 +31,11 @@ export interface AnalyzerSources {
   readonly vocabulary: () => Promise<ReadonlySet<string>>;
   /** Called once, on the first comment scored. */
   readonly zipf: () => ZipfLookup;
-  /** Read per analysis; call `clear` when they change. */
-  readonly settings: () => Pick<Settings, "weights" | "ramp" | "acronyms">;
+  /** Read per analysis; a change must replace the object, not mutate it. */
+  readonly settings: () => ScoringSettings;
 }
+
+export type ScoringSettings = Pick<Settings, "weights" | "ramp" | "acronyms">;
 
 /**
  * Scores a document's comments, cached per document version. Languages with a grammar wait for
@@ -43,6 +46,8 @@ export class CommentAnalyzer {
     string,
     { readonly version: number; readonly comments: Promise<ScoredComment[]> }
   >();
+  /** Per comment, from each document's previous analysis; `null` for ones too short to score. */
+  private readonly results = new DocumentCache<Omit<ScoredComment, "comment"> | null>();
   private zipf: ZipfLookup | undefined;
 
   constructor(private readonly sources: AnalyzerSources) {}
@@ -57,7 +62,7 @@ export class CommentAnalyzer {
       // The tree is not parsed yet: ask again once it is, rather than caching nothing.
       return Promise.resolve([]);
     }
-    const comments = this.score(document.languageId, found);
+    const comments = this.score(key, document.languageId, found);
     this.cache.set(key, { version: document.version, comments });
     // A failure, like an unreadable vocabulary, is not kept: the next request tries again.
     comments.catch(() => {
@@ -70,11 +75,13 @@ export class CommentAnalyzer {
 
   forget(key: string): void {
     this.cache.delete(key);
+    this.results.forget(key);
   }
 
   /** Drops every cached result, as when the settings change. */
   clear(): void {
     this.cache.clear();
+    this.results.clear();
   }
 
   private comments(key: string, document: SourceDocument): Comment[] | undefined {
@@ -87,39 +94,59 @@ export class CommentAnalyzer {
     return syntax === undefined ? [] : scanComments(document.getText(), syntax);
   }
 
-  private async score(languageId: string, comments: Comment[]): Promise<ScoredComment[]> {
+  private async score(
+    documentKey: string,
+    languageId: string,
+    comments: Comment[],
+  ): Promise<ScoredComment[]> {
     if (comments.length === 0) {
       return [];
     }
-    const { weights, ramp, acronyms } = this.sources.settings();
+    const settings = this.sources.settings();
     const workspace = await this.sources.vocabulary();
-    // Whitelisted acronyms are known terms: neither undefined nor rare.
-    const vocabulary = acronyms.size === 0 ? workspace : new Set([...workspace, ...acronyms]);
-    this.zipf ??= this.sources.zipf();
+    // Both are replaced, never mutated, when they change; either way every result is stale.
+    const results = this.results.begin(documentKey, [workspace, settings]);
     const scored: ScoredComment[] = [];
     for (const comment of comments) {
-      const { text, identifiers } = normalize(
-        comment.rawText,
-        dialectFor(languageId, comment.kind),
-      );
-      const symbol = comment.targetSymbolName;
-      const context = {
-        identifiers: new Set(symbol === undefined ? identifiers : [...identifiers, symbol]),
-        vocabulary,
-        zipf: this.zipf,
-      };
-      const results = measure(text, context);
-      if (results.words < MIN_WORDS) {
-        continue;
+      const dialect = dialectFor(languageId, comment.kind);
+      const key = commentKey(dialect, comment.rawText, comment.targetSymbolName);
+      let result = results.get(key);
+      if (result === undefined) {
+        result = this.measure(comment, dialect, workspace, settings);
+        results.set(key, result);
       }
-      scored.push({
-        comment,
-        text,
-        words: results.words,
-        score: composite(results, weights, DEFAULT_BANDS, ramp),
-        redundancy: redundancy(text, symbol),
-      });
+      if (result !== null) {
+        scored.push({ comment, ...result });
+      }
     }
     return scored;
+  }
+
+  /** Scores one comment from scratch; `null` if it is too short to score. */
+  private measure(
+    comment: Comment,
+    dialect: Dialect,
+    workspace: ReadonlySet<string>,
+    { weights, ramp, acronyms }: ScoringSettings,
+  ): Omit<ScoredComment, "comment"> | null {
+    this.zipf ??= this.sources.zipf();
+    const { text, identifiers } = normalize(comment.rawText, dialect);
+    const symbol = comment.targetSymbolName;
+    const context = {
+      identifiers: new Set(symbol === undefined ? identifiers : [...identifiers, symbol]),
+      // Whitelisted acronyms are known terms: neither undefined nor rare.
+      vocabulary: acronyms.size === 0 ? workspace : new Set([...workspace, ...acronyms]),
+      zipf: this.zipf,
+    };
+    const results = measure(text, context);
+    if (results.words < MIN_WORDS) {
+      return null;
+    }
+    return {
+      text,
+      words: results.words,
+      score: composite(results, weights, DEFAULT_BANDS, ramp),
+      redundancy: redundancy(text, symbol),
+    };
   }
 }

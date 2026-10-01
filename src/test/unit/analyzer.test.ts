@@ -112,6 +112,34 @@ describe("CommentAnalyzer", () => {
     expect(subject.analyze("e.ts", document(SOURCE, "typescript", 3))).toBe(newer);
   });
 
+  it("reuses results of unchanged comments across versions", async () => {
+    const vocabulary = new Set<string>();
+    const { analyzer: subject } = analyzer({ vocabulary: async () => vocabulary });
+    const doc = document(SOURCE);
+    await trees.open("f.ts", doc);
+    const before = await subject.analyze("f.ts", doc);
+
+    // Moved down a line by an edit above: same comments, so the same results.
+    const moved = document(`\n${SOURCE}`, "typescript", 2);
+    await trees.open("f.ts", moved);
+    const after = await subject.analyze("f.ts", moved);
+    expect(after.map(({ score }) => score)).toEqual(before.map(({ score }) => score));
+    expect(after[0]!.score).toBe(before[0]!.score);
+    expect(after[0]!.comment.range.start.row).toBe(1);
+  });
+
+  it("rescores everything when the vocabulary changes", async () => {
+    let vocabulary: ReadonlySet<string> = new Set();
+    const { analyzer: subject } = analyzer({ vocabulary: async () => vocabulary });
+    const doc = document(SOURCE);
+    await trees.open("g.ts", doc);
+    const [before] = await subject.analyze("g.ts", doc);
+    vocabulary = new Set(["user"]);
+    subject.forget("g.ts");
+    const [after] = await subject.analyze("g.ts", doc);
+    expect(after!.score).not.toBe(before!.score);
+  });
+
   it("scans fallback languages without a tree, marking them approximate", async () => {
     const doc = document("// Retries the upload when the network drops.\nval x = 1", "kotlin");
     const [scored] = await analyzer().analyzer.analyze("a.kt", doc);
