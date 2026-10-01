@@ -91,7 +91,9 @@ export class ComplexityDiagnostics {
     }
     const { version } = document;
     const comments = await analyze(this.analyzer, settings, document);
-    if (document.version !== version || document.isClosed) {
+    // Outdated: the document changed, closed, or the settings changed (each change is a new
+    // object), and a newer update owns the result.
+    if (document.version !== version || document.isClosed || this.settings() !== settings) {
       return;
     }
     this.collection.set(
