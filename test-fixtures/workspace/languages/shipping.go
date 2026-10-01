@@ -2,9 +2,11 @@
 
 package shipping
 
+import "math"
+
 // ParcelWeight returns the parcel weight in grams, rounded up to the next whole gram.
 func ParcelWeight(grams float64) int {
-	return int(grams + 0.999)
+	return int(math.Ceil(grams))
 }
 
 // GetCarrier gets the carrier.

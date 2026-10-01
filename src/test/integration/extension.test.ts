@@ -243,9 +243,9 @@ suite("Extension", () => {
       "shipping.go",
       "go",
       [
-        { line: 4, ...plain },
-        { line: 9, ...plain, restatesName: true },
-        { line: 14, ...dense },
+        { line: 6, ...plain },
+        { line: 11, ...plain, restatesName: true },
+        { line: 16, ...dense },
       ],
     ],
     [
@@ -270,13 +270,16 @@ suite("Extension", () => {
       assert.strictEqual(document.languageId, language);
       await vscode.window.showTextDocument(document);
 
+      let found: vscode.CodeLens[] = [];
+      const titles = () => JSON.stringify(found.map((lens) => lens.command?.title));
       const lenses = await waitFor(async () => {
-        const found = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+        found = await vscode.commands.executeCommand<vscode.CodeLens[]>(
           "vscode.executeCodeLensProvider",
           document.uri,
         );
-        // All of a file's lenses come in one response, once its tree is parsed.
-        return found.length > 0 ? found : undefined;
+        return found.length === expected.length ? found : undefined;
+      }).catch(() => {
+        throw new Error(`Expected ${expected.length} lenses, last saw ${titles()}`);
       });
       const actual = lenses
         .map((lens) => ({ line: lens.range.start.line, title: lens.command?.title ?? "" }))
@@ -284,11 +287,13 @@ suite("Extension", () => {
       assert.deepStrictEqual(
         actual.map(({ line }) => line),
         expected.map(({ line }) => line),
-        `lenses: ${JSON.stringify(actual)}`,
+        `lenses: ${titles()}`,
       );
       for (const [i, { title }] of actual.entries()) {
         const { line, min, max, restatesName = false } = expected[i]!;
-        const score = Number(/^complexity (\d+\.\d)/.exec(title)?.[1]);
+        const match = /^complexity (\d+\.\d)/.exec(title);
+        assert.ok(match, `line ${line}: unexpected title format: ${title}`);
+        const score = Number(match[1]);
         assert.ok(score >= min && score <= max, `line ${line}: ${title} not in ${min}-${max}`);
         assert.strictEqual(title.includes("restates name"), restatesName, title);
         assert.ok(!title.includes("approx"), title);
