@@ -1,4 +1,10 @@
-import { READABILITY_METRICS, readabilityWeight, textStats } from "../metrics/readability";
+import {
+  DEFAULT_RAMP,
+  READABILITY_METRICS,
+  type Ramp,
+  readabilityWeight,
+  textStats,
+} from "../metrics/readability";
 import { type MetricContext, type MetricResult, SHORT_METRICS } from "../metrics/short";
 import { tokenize } from "../metrics/tokens";
 import calibrated from "./weights.json";
@@ -64,6 +70,8 @@ export interface Score {
   readonly score: number;
   /** The score's band; compared before rounding. */
   readonly label: Label;
+  /** How much the readability formulas counted, 0 to 1, from the comment's length. */
+  readonly readability: number;
   /** Reasons of the metrics that added the most points, most first. */
   readonly reasons: readonly string[];
   /** Every metric, in `Weights` order. */
@@ -89,8 +97,9 @@ export function composite(
   results: MetricResults,
   weights: Weights = DEFAULT_WEIGHTS,
   bands: Bands = DEFAULT_BANDS,
+  ramp: Ramp = DEFAULT_RAMP,
 ): Score {
-  const blend = readabilityWeight(results.words);
+  const blend = readabilityWeight(results.words, ramp);
   const scored = (Object.keys(weights) as MetricName[]).map((metric) => {
     const result = isShort(metric) ? results.short[metric] : results.readability[metric];
     const config = weights[metric];
@@ -117,6 +126,7 @@ export function composite(
   return {
     score: Math.round(score * 10) / 10,
     label: labelFor(score, bands),
+    readability: blend,
     reasons,
     contributions,
   };

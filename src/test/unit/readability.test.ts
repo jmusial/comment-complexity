@@ -128,4 +128,11 @@ describe("readabilityWeight", () => {
   ])("%i words → %s", (words, weight) => {
     expect(readabilityWeight(words)).toBeCloseTo(weight);
   });
+
+  it("follows another ramp", () => {
+    const ramp = { start: 10, end: 20 };
+    expect(readabilityWeight(10, ramp)).toBe(0);
+    expect(readabilityWeight(15, ramp)).toBeCloseTo(0.5);
+    expect(readabilityWeight(20, ramp)).toBe(1);
+  });
 });

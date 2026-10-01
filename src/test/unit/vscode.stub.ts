@@ -30,7 +30,11 @@ export const events = {
   save: emitter<unknown>(),
   delete: emitter<unknown>(),
   rename: emitter<unknown>(),
+  configuration: emitter<{ affectsConfiguration(section: string): boolean }>(),
 };
+
+/** `commentComplexity.*` values, by key; tests set them, then fire `events.configuration`. */
+export const configuration: Record<string, unknown> = {};
 
 export const log = {
   info: vi.fn<(message: string) => void>(),
@@ -103,7 +107,32 @@ export class Hover {
 /** Registered providers, by kind. */
 type Selector = readonly { language: string }[];
 const registered = () => ({ dispose: () => {} });
+export enum DiagnosticSeverity {
+  Error = 0,
+  Warning = 1,
+  Information = 2,
+  Hint = 3,
+}
+
+export class Diagnostic {
+  source?: string;
+  constructor(
+    readonly range: Range,
+    readonly message: string,
+    readonly severity: DiagnosticSeverity,
+  ) {}
+}
+
+/** Diagnostics by URI string, as the collection last set them. */
+export const diagnostics = new Map<string, readonly Diagnostic[]>();
+
 export const languages = {
+  createDiagnosticCollection: () => ({
+    set: (uri: { toString(): string }, items: readonly Diagnostic[]) =>
+      diagnostics.set(uri.toString(), items),
+    delete: (uri: { toString(): string }) => diagnostics.delete(uri.toString()),
+    dispose: () => diagnostics.clear(),
+  }),
   registerCodeLensProvider:
     vi.fn<(selector: Selector, provider: unknown) => { dispose(): void }>(registered),
   registerHoverProvider:
@@ -118,6 +147,10 @@ export const workspace = {
   onDidSaveTextDocument: events.save.event,
   onDidDeleteFiles: events.delete.event,
   onDidRenameFiles: events.rename.event,
+  onDidChangeConfiguration: events.configuration.event,
+  getConfiguration: (section: string) => ({
+    get: (key: string): unknown => configuration[`${section}.${key}`],
+  }),
   findFiles: vi.fn<(include: string, exclude: string, maxResults: number) => Promise<StubUri[]>>(
     async () => [],
   ),
