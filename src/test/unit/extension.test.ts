@@ -3,6 +3,10 @@ import { activate, deactivate } from "../../extension";
 import { EXCLUDE, INCLUDE } from "../../vocab/workspace";
 // The same module `extension.ts` gets as `vscode` (see vitest.config.mts).
 import * as vscode from "./vscode.stub";
+import type { ComplexityHoverProvider, ComplexityLensProvider } from "../../ui/providers";
+
+// The stub's extension has no data folder; every word is everyday.
+vi.mock("../../metrics/zipf", () => ({ loadZipf: () => () => 5 }));
 
 const uri = (filePath: string) => ({ path: filePath, toString: () => `file://${filePath}` });
 
@@ -73,6 +77,56 @@ describe("activate", () => {
       "Failed to read identifiers from file:///ws/a.ts",
       expect.anything(),
     );
+  });
+
+  it("shows a lens and a hover over each comment, approximate without a grammar", async () => {
+    start();
+    const [selector, lensProvider] = vscode.languages.registerCodeLensProvider.mock.calls[0]!;
+    const [, hoverProvider] = vscode.languages.registerHoverProvider.mock.calls[0]!;
+    expect(selector).toContainEqual({ language: "typescript" });
+    expect(selector).toContainEqual({ language: "kotlin" });
+
+    const document = {
+      uri: uri("/ws/a.kt"),
+      languageId: "kotlin",
+      version: 1,
+      getText: () => "// Retries the upload when the network drops.\nval x = 1",
+    };
+    const lenses = await (lensProvider as ComplexityLensProvider).provideCodeLenses(
+      document as never,
+    );
+    expect(lenses).toHaveLength(1);
+    expect(lenses[0]!.command!.title).toMatch(/^complexity \d+\.\d.* · approx$/);
+    expect(lenses[0]!.range).toMatchObject({ start: { line: 0, character: 0 } });
+
+    const hover = (hoverProvider as ComplexityHoverProvider).provideHover.bind(hoverProvider);
+    const shown = await hover(document as never, new vscode.Position(0, 5) as never);
+    expect((shown!.contents as unknown as vscode.MarkdownString).value).toContain(
+      "**Comment complexity",
+    );
+    expect(await hover(document as never, new vscode.Position(1, 2) as never)).toBeUndefined();
+  });
+
+  it("asks for fresh lenses once a document is parsed, and forgets it on close", async () => {
+    const { analyzer } = start();
+    const lensProvider = vscode.languages.registerCodeLensProvider.mock
+      .calls[0]![1] as ComplexityLensProvider;
+    const refreshed = vi.fn<() => void>();
+    lensProvider.onDidChangeCodeLenses(refreshed);
+    const forget = vi.spyOn(analyzer, "forget");
+
+    const document = {
+      uri: uri("/ws/b.ts"),
+      languageId: "typescript",
+      version: 1,
+      getText: () => "",
+    };
+    vscode.events.open.fire(document);
+    await vi.waitFor(() => expect(refreshed).toHaveBeenCalled());
+    // Its grammar is missing, so there is no tree and nothing to show.
+    expect(await lensProvider.provideCodeLenses(document as never)).toEqual([]);
+    vscode.events.close.fire(document);
+    expect(forget).toHaveBeenCalledWith("file:///ws/b.ts");
   });
 
   it("stops listening when its subscriptions are disposed", () => {

@@ -8,10 +8,13 @@ async function activate(): Promise<ExtensionApi> {
   return ext.activate();
 }
 
-async function waitFor<T>(read: () => T | undefined, timeoutMs = 5000): Promise<T> {
+async function waitFor<T>(
+  read: () => T | undefined | Promise<T | undefined>,
+  timeoutMs = 5000,
+): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const value = read();
+    const value = await read();
     if (value !== undefined) {
       return value;
     }
@@ -63,5 +66,35 @@ suite("Extension", () => {
     }
     // Built once, then cached.
     assert.strictEqual(await vocabulary.words(), words);
+  });
+
+  test("shows a lens above each comment and the breakdown on hover", async () => {
+    await activate();
+    const document = await vscode.workspace.openTextDocument({
+      language: "typescript",
+      content: "// Retries the upload when the network drops.\nconst retries = 3;\n",
+    });
+    const lenses = await waitFor(async () => {
+      const found = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+        "vscode.executeCodeLensProvider",
+        document.uri,
+      );
+      return found.some((lens) => lens.command?.title.startsWith("complexity")) ? found : undefined;
+    });
+    const lens = lenses.find((found) => found.command?.title.startsWith("complexity"));
+    assert.strictEqual(lens?.range.start.line, 0);
+    assert.ok(!lens.command?.title.includes("approx"), lens.command?.title);
+
+    const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+      "vscode.executeHoverProvider",
+      document.uri,
+      new vscode.Position(0, 8),
+    );
+    const markdown = hovers
+      .flatMap((hover) => hover.contents)
+      .map((content) => (typeof content === "string" ? content : content.value))
+      .join("\n");
+    assert.match(markdown, /\*\*Comment complexity \d+\.\d \/ 10\*\*/);
+    assert.match(markdown, /\| Clauses \|/);
   });
 });

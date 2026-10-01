@@ -50,6 +50,66 @@ export const Uri = {
   }),
 };
 
+export class EventEmitter<T> {
+  private readonly emitter = emitter<T>();
+  readonly event = this.emitter.event;
+  fire(value: T): void {
+    this.emitter.fire(value);
+  }
+  dispose(): void {}
+}
+
+export class Position {
+  constructor(
+    readonly line: number,
+    readonly character: number,
+  ) {}
+}
+
+export class Range {
+  readonly start: Position;
+  readonly end: Position;
+  constructor(startLine: number, startCharacter: number, endLine: number, endCharacter: number) {
+    this.start = new Position(startLine, startCharacter);
+    this.end = new Position(endLine, endCharacter);
+  }
+  contains({ line, character }: Position): boolean {
+    const after =
+      line > this.start.line || (line === this.start.line && character >= this.start.character);
+    const before =
+      line < this.end.line || (line === this.end.line && character <= this.end.character);
+    return after && before;
+  }
+}
+
+export class CodeLens {
+  constructor(
+    readonly range: Range,
+    readonly command: { title: string },
+  ) {}
+}
+
+export class MarkdownString {
+  constructor(readonly value: string) {}
+}
+
+export class Hover {
+  constructor(
+    readonly contents: MarkdownString,
+    readonly range: Range,
+  ) {}
+}
+
+/** Registered providers, by kind. */
+type Selector = readonly { language: string }[];
+const registered = () => ({ dispose: () => {} });
+export const languages = {
+  registerCodeLensProvider:
+    vi.fn<(selector: Selector, provider: unknown) => { dispose(): void }>(registered),
+  registerHoverProvider:
+    vi.fn<(selector: Selector, provider: unknown) => { dispose(): void }>(registered),
+};
+
 export const workspace = {
   textDocuments: [] as unknown[],
   onDidOpenTextDocument: events.open.event,
