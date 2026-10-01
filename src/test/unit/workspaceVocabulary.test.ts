@@ -264,6 +264,28 @@ describe("WorkspaceVocabulary", () => {
       expect([...(await building)]).toEqual([]);
       vocabulary.dispose();
     });
+
+    it("discards a read that went stale while its grammar loaded", async () => {
+      const { workspace, loader, vocabulary } = setup();
+      workspace.files.set("/ws/slow.ts", "const slowPoke = 1;");
+      const createParser = loader.createParser.bind(loader);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const loading = vi.spyOn(loader, "createParser").mockImplementationOnce(async (id) => {
+        await gate;
+        return createParser(id);
+      });
+
+      const building = vocabulary.words();
+      await vi.waitFor(() => expect(loading).toHaveBeenCalled());
+      workspace.delete("/ws/slow.ts");
+      release();
+
+      expect([...(await building)]).toEqual([]);
+      vocabulary.dispose();
+    });
   });
 
   describe("on rename", () => {

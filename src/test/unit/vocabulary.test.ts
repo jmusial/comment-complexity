@@ -61,7 +61,32 @@ describe("Vocabulary", () => {
   });
 });
 
+describe("Vocabulary.rename", () => {
+  it("moves a file's words to its new key", () => {
+    const vocabulary = new Vocabulary();
+    vocabulary.set("a.ts", ["ledger"]);
+    vocabulary.rename("a.ts", "b.ts");
+    vocabulary.remove("a.ts");
+    expect([...vocabulary.words()]).toEqual(["ledger"]);
+    vocabulary.remove("b.ts");
+    expect([...vocabulary.words()]).toEqual([]);
+  });
+
+  it("ignores a file it does not know", () => {
+    const vocabulary = new Vocabulary();
+    vocabulary.set("a.ts", ["ledger"]);
+    const before = vocabulary.words();
+    vocabulary.rename("unknown.ts", "b.ts");
+    expect(vocabulary.words()).toBe(before);
+    expect(vocabulary.files).toBe(1);
+  });
+});
+
 describe("identifierWords", () => {
+  it("skips single letters and parts with digits", async () => {
+    expect(await wordsOf("const x = 1;\nlet utf8Value = 2;")).toEqual(new Set(["value"]));
+  });
+
   it("reads identifiers, not comments or strings", async () => {
     const words = await wordsOf(
       [
