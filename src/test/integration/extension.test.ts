@@ -207,4 +207,92 @@ suite("Extension", () => {
     assert.strictEqual(vscode.window.activeTextEditor?.selection.active.character, 0);
     assert.strictEqual(vscode.window.activeTextEditor?.selection.active.line, 0);
   });
+
+  /** Lens a fixture comment should get: its line (0-based) and score range. */
+  interface ExpectedLens {
+    readonly line: number;
+    readonly min: number;
+    readonly max: number;
+    readonly restatesName?: boolean;
+  }
+
+  // Each fixture has a plain doc comment, one that restates its function's name and a dense one.
+  // License headers, short labels and commented-out code get no lens.
+  const plain = { min: 0, max: 2 };
+  const dense = { min: 4, max: 10 };
+  const LANGUAGES: readonly [file: string, language: string, lenses: ExpectedLens[]][] = [
+    [
+      "shipping.ts",
+      "typescript",
+      [
+        { line: 2, ...plain },
+        { line: 7, ...plain, restatesName: true },
+        { line: 12, ...dense },
+      ],
+    ],
+    [
+      "shipping.py",
+      "python",
+      [
+        { line: 4, ...plain },
+        { line: 9, ...plain, restatesName: true },
+        { line: 13, ...dense },
+      ],
+    ],
+    [
+      "shipping.go",
+      "go",
+      [
+        { line: 4, ...plain },
+        { line: 9, ...plain, restatesName: true },
+        { line: 14, ...dense },
+      ],
+    ],
+    [
+      "shipping.rs",
+      "rust",
+      [
+        { line: 2, ...plain },
+        { line: 7, ...plain, restatesName: true },
+        { line: 12, ...dense },
+      ],
+    ],
+  ];
+
+  for (const [file, language, expected] of LANGUAGES) {
+    test(`scores ${language} comments: lens count, position and score range`, async () => {
+      await activate();
+      const [folder] = vscode.workspace.workspaceFolders ?? [];
+      assert.ok(folder, "the test workspace is open");
+      const document = await vscode.workspace.openTextDocument(
+        vscode.Uri.joinPath(folder.uri, "languages", file),
+      );
+      assert.strictEqual(document.languageId, language);
+      await vscode.window.showTextDocument(document);
+
+      const lenses = await waitFor(async () => {
+        const found = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+          "vscode.executeCodeLensProvider",
+          document.uri,
+        );
+        // All of a file's lenses come in one response, once its tree is parsed.
+        return found.length > 0 ? found : undefined;
+      });
+      const actual = lenses
+        .map((lens) => ({ line: lens.range.start.line, title: lens.command?.title ?? "" }))
+        .toSorted((a, b) => a.line - b.line);
+      assert.deepStrictEqual(
+        actual.map(({ line }) => line),
+        expected.map(({ line }) => line),
+        `lenses: ${JSON.stringify(actual)}`,
+      );
+      for (const [i, { title }] of actual.entries()) {
+        const { line, min, max, restatesName = false } = expected[i]!;
+        const score = Number(/^complexity (\d+\.\d)/.exec(title)?.[1]);
+        assert.ok(score >= min && score <= max, `line ${line}: ${title} not in ${min}-${max}`);
+        assert.strictEqual(title.includes("restates name"), restatesName, title);
+        assert.ok(!title.includes("approx"), title);
+      }
+    });
+  }
 });
