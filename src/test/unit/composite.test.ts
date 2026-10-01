@@ -1,49 +1,31 @@
 import { describe, expect, it } from "vitest";
-import type { MetricContext, MetricResult } from "../../metrics/short";
+import type { MetricContext } from "../../metrics/short";
 import { loadZipf } from "../../metrics/zipf";
+import { PRIOR_WEIGHTS } from "../../score/calibration";
 import {
+  type Bands,
   DEFAULT_WEIGHTS,
   type MetricResults,
   TOP_REASONS,
   type Weights,
   composite,
   difficulty,
+  labelFor,
   scoreComment,
 } from "../../score/composite";
+import { results } from "./metricResults";
 
-/** Results at each metric's easy threshold, so every difficulty is 0, with overrides. */
-function results(
-  overrides: Partial<Record<keyof Weights, MetricResult>> = {},
-  words = 10,
-): MetricResults {
-  const at = (metric: keyof Weights): MetricResult =>
-    overrides[metric] ?? { value: DEFAULT_WEIGHTS[metric].easy };
-  return {
-    short: {
-      nounStack: at("nounStack"),
-      clauseCount: at("clauseCount"),
-      meanZipf: at("meanZipf"),
-      minZipf: at("minZipf"),
-      lexicalDensity: at("lexicalDensity"),
-      negationCount: at("negationCount"),
-      danglingReference: at("danglingReference"),
-      undefinedAcronyms: at("undefinedAcronyms"),
-    },
-    readability: {
-      fleschKincaidGrade: at("fleschKincaidGrade"),
-      gunningFog: at("gunningFog"),
-      colemanLiau: at("colemanLiau"),
-      averageSentenceLength: at("averageSentenceLength"),
-    },
-    words,
-  };
-}
+/** Fixed weights, so the arithmetic below does not change when calibration refits the defaults. */
+const WEIGHTS = PRIOR_WEIGHTS;
+const BANDS: Bands = { ok: 3, hard: 6 };
+const score = (measured: MetricResults, weights: Weights = WEIGHTS) =>
+  composite(measured, weights, BANDS);
 
 /** Every metric at its hard threshold. */
 const allHard = (words: number) =>
   results(
     Object.fromEntries(
-      Object.entries(DEFAULT_WEIGHTS).map(([metric, { hard }]) => [metric, { value: hard }]),
+      Object.entries(WEIGHTS).map(([metric, { hard }]) => [metric, { value: hard }]),
     ),
     words,
   );
@@ -81,28 +63,28 @@ describe("difficulty", () => {
 
 describe("composite", () => {
   it("scores 0 with no reasons when every metric is easy", () => {
-    expect(composite(results())).toMatchObject({ score: 0, reasons: [] });
+    expect(score(results())).toMatchObject({ score: 0, reasons: [] });
   });
 
   it("scores 10 when every metric is hard, short or long", () => {
-    expect(composite(allHard(10)).score).toBe(10);
-    expect(composite(allHard(60)).score).toBe(10);
+    expect(score(allHard(10)).score).toBe(10);
+    expect(score(allHard(60)).score).toBe(10);
   });
 
   it("blends the readability formulas in by length", () => {
     // Below 20 words the formulas are noise.
-    expect(composite(hardReadability(15))).toMatchObject({ score: 0, reasons: [] });
-    // Half weight at 30 words: 4 × 0.5 of 8.5 + 4 × 0.5.
-    expect(composite(hardReadability(30)).score).toBeCloseTo(1.9);
-    // Full weight from 40: 4 of 12.5.
-    expect(composite(hardReadability(40))).toMatchObject({
-      score: 3.2,
+    expect(score(hardReadability(15))).toMatchObject({ score: 0, reasons: [] });
+    // Half weight at 30 words: 4 × 0.5 of 9.5 + 4 × 0.5.
+    expect(score(hardReadability(30)).score).toBeCloseTo(1.7);
+    // Full weight from 40: 4 of 13.5.
+    expect(score(hardReadability(40))).toMatchObject({
+      score: 3,
       reasons: ["Flesch-Kincaid grade 16"],
     });
   });
 
   it("gives the reasons of the biggest contributors, at most three", () => {
-    const score = composite(
+    const scored = score(
       results({
         undefinedAcronyms: { value: 2, reason: "Undefined acronyms: SQS, DLQ" },
         nounStack: { value: 3, reason: 'Noun stack: "retry queue item"' },
@@ -112,47 +94,56 @@ describe("composite", () => {
         clauseCount: { value: 5 },
       }),
     );
-    expect(score.reasons).toHaveLength(TOP_REASONS);
-    expect(score.reasons).toEqual([
+    expect(scored.reasons).toHaveLength(TOP_REASONS);
+    expect(scored.reasons).toEqual([
       "Undefined acronyms: SQS, DLQ",
       "3 negations",
       'Rare word: "idempotent"',
     ]);
-    const total = score.contributions.reduce((sum, { points }) => sum + points, 0);
-    expect(score.score).toBeCloseTo(total, 1);
+    const total = scored.contributions.reduce((sum, { points }) => sum + points, 0);
+    expect(scored.score).toBeCloseTo(total, 1);
   });
 
   it("names uncommon vocabulary, which has no reason of its own", () => {
-    const score = composite(results({ meanZipf: { value: 3.5 } }));
-    expect(score.reasons).toEqual(["Uncommon vocabulary"]);
-    expect(score.contributions.find(({ metric }) => metric === "meanZipf")).toMatchObject({
+    const scored = score(results({ meanZipf: { value: 3.5 } }));
+    expect(scored.reasons).toEqual(["Uncommon vocabulary"]);
+    expect(scored.contributions.find(({ metric }) => metric === "meanZipf")).toMatchObject({
       difficulty: 1,
-      points: 10 / 8.5,
+      points: 10 / 9.5,
     });
   });
 
   it("leaves out reasons of metrics that add nothing", () => {
     // A metric may give a reason below the composite's easy threshold.
-    const score = composite(results({ lexicalDensity: { value: 0.4, reason: "Dense" } }));
-    expect(score.reasons).toEqual([]);
+    const scored = score(results({ lexicalDensity: { value: 0.4, reason: "Dense" } }));
+    expect(scored.reasons).toEqual([]);
   });
 
   it("takes other weights", () => {
     const weights: Weights = Object.fromEntries(
-      Object.entries(DEFAULT_WEIGHTS).map(([metric, config]) => [
+      Object.entries(WEIGHTS).map(([metric, config]) => [
         metric,
         { ...config, weight: metric === "negationCount" ? 1 : 0 },
       ]),
     ) as Weights;
-    expect(composite(results({ negationCount: { value: 3 } }), weights).score).toBe(10);
-    expect(composite(results({ nounStack: { value: 5 } }), weights).score).toBe(0);
+    expect(score(results({ negationCount: { value: 3 } }), weights).score).toBe(10);
+    expect(score(results({ nounStack: { value: 5 } }), weights).score).toBe(0);
+  });
+
+  it("labels the score by its band, before rounding", () => {
+    expect(score(results()).label).toBe("easy");
+    expect(score(allHard(10)).label).toBe("hard");
+    expect(labelFor(2.99, BANDS)).toBe("easy");
+    expect(labelFor(3, BANDS)).toBe("ok");
+    expect(labelFor(5.99, BANDS)).toBe("ok");
+    expect(labelFor(6, BANDS)).toBe("hard");
   });
 
   it("scores 0 when nothing has weight", () => {
     const weights = Object.fromEntries(
-      Object.entries(DEFAULT_WEIGHTS).map(([metric, config]) => [metric, { ...config, weight: 0 }]),
+      Object.entries(WEIGHTS).map(([metric, config]) => [metric, { ...config, weight: 0 }]),
     ) as Weights;
-    expect(composite(allHard(60), weights).score).toBe(0);
+    expect(score(allHard(60), weights).score).toBe(0);
   });
 });
 
@@ -169,8 +160,8 @@ describe("scoreComment", () => {
       "Idempotent DLQ reconciliation shard lease heartbeat isn't never not renewed unless it wasn't.",
       context,
     );
-    expect(plain.score).toBeLessThan(1);
-    expect(dense.score).toBeGreaterThan(3);
+    expect(plain).toMatchObject({ label: "easy" });
+    expect(dense.score).toBeGreaterThan(plain.score + 2);
     expect(dense.reasons).toHaveLength(TOP_REASONS);
     expect(dense.contributions.map(({ metric }) => metric)).toEqual(Object.keys(DEFAULT_WEIGHTS));
   });
@@ -181,11 +172,11 @@ describe("scoreComment", () => {
       "asynchronously revalidates intermediate authorization certificates whenever administrative " +
       "configuration modifications necessitate comprehensive recomputation of dependent " +
       "infrastructure.";
-    const score = scoreComment(`${sentence} ${sentence}`, context);
-    const readability = score.contributions.filter(({ metric }) =>
+    const long = scoreComment(`${sentence} ${sentence}`, context);
+    const readability = long.contributions.filter(({ metric }) =>
       ["fleschKincaidGrade", "gunningFog", "colemanLiau", "averageSentenceLength"].includes(metric),
     );
     expect(readability.every(({ points }) => points > 0)).toBe(true);
-    expect(score.score).toBeGreaterThan(5);
+    expect(long.label).toBe("hard");
   });
 });

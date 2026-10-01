@@ -1,0 +1,73 @@
+{
+  "weights": {
+    "nounStack": {
+      "weight": 1.042,
+      "easy": 2,
+      "hard": 5
+    },
+    "clauseCount": {
+      "weight": 1.079,
+      "easy": 2,
+      "hard": 5
+    },
+    "meanZipf": {
+      "weight": 0.889,
+      "easy": 5.5,
+      "hard": 3.5
+    },
+    "minZipf": {
+      "weight": 1.222,
+      "easy": 4,
+      "hard": 2
+    },
+    "lexicalDensity": {
+      "weight": 0.365,
+      "easy": 0.5,
+      "hard": 0.85
+    },
+    "negationCount": {
+      "weight": 1.072,
+      "easy": 0,
+      "hard": 3
+    },
+    "danglingReference": {
+      "weight": 1.032,
+      "easy": 0,
+      "hard": 2
+    },
+    "undefinedAcronyms": {
+      "weight": 1.485,
+      "easy": 0,
+      "hard": 2
+    },
+    "commentLength": {
+      "weight": 1.158,
+      "easy": 10,
+      "hard": 60
+    },
+    "fleschKincaidGrade": {
+      "weight": 1.014,
+      "easy": 8,
+      "hard": 16
+    },
+    "gunningFog": {
+      "weight": 1.051,
+      "easy": 8,
+      "hard": 16
+    },
+    "colemanLiau": {
+      "weight": 1.025,
+      "easy": 8,
+      "hard": 16
+    },
+    "averageSentenceLength": {
+      "weight": 0.993,
+      "easy": 15,
+      "hard": 30
+    }
+  },
+  "bands": {
+    "ok": 1.08,
+    "hard": 4.128
+  }
+}

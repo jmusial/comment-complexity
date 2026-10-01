@@ -4,6 +4,7 @@ import {
   type MetricContext,
   type MetricResult,
   clauseCount,
+  commentLength,
   danglingReference,
   lexicalDensity,
   meanZipf,
@@ -172,6 +173,16 @@ describe("undefinedAcronyms", () => {
     [
       "Uses/VERB the/DET Bureau/PROPN of/ADP Labor/PROPN Statistics/PROPN (/PUNCT BLS/PROPN )/PUNCT",
       { value: 0 },
+    ],
+  ]);
+});
+
+describe("commentLength", () => {
+  table(commentLength, [
+    ["Returns/VERB the/DET user/NOUN ./PUNCT", { value: 3 }],
+    [
+      Array.from({ length: 60 }, () => "word/NOUN").join(" "),
+      { value: 60, reason: "Long comment: 60 words" },
     ],
   ]);
 });

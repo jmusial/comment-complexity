@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`calibration dataset > ranks hard comments above easy ones at least 75% of the time 1`] = `
+{
+  "agreement": 0.547,
+  "confusion": {
+    "easy": {
+      "easy": 17,
+      "hard": 0,
+      "ok": 32,
+    },
+    "hard": {
+      "easy": 1,
+      "hard": 10,
+      "ok": 18,
+    },
+    "ok": {
+      "easy": 14,
+      "hard": 3,
+      "ok": 55,
+    },
+  },
+  "easyBelowHard": 0.88,
+  "ordered": 0.745,
+  "samples": 150,
+}
+`;
