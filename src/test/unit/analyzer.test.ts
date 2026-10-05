@@ -147,6 +147,12 @@ describe("CommentAnalyzer", () => {
     expect(scored!.comment.approx).toBe(true);
   });
 
+  it("gives divider comments no score", async () => {
+    const doc = document("// =====================\n// ===== Helpers =====\nconst a = 1;");
+    await trees.open("h.ts", doc);
+    expect(await analyzer().analyzer.analyze("h.ts", doc)).toEqual([]);
+  });
+
   it("has nothing to score in unknown languages or comment-free code", async () => {
     const { analyzer: subject, sources } = analyzer();
     expect(await subject.analyze("a.txt", document("# not code", "plaintext"))).toEqual([]);
