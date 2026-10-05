@@ -56,7 +56,8 @@ export function normalize(rawText: string, dialect: Dialect): NormalizedComment 
     case "plain":
       break;
   }
-  const text = units(lines)
+  // After the dialects: NumPy docstrings mark their section titles with `-----` underlines.
+  const text = units(withoutRules(lines))
     .map((unit) => inline(unit, dialect, identifiers))
     .filter((unit) => unit !== "")
     .join("\n");
@@ -99,12 +100,35 @@ function withoutMarkers(rawText: string): string[] {
       text.endsWith(close) && text.length - close.length >= open.length
         ? text.length - close.length
         : text.length;
-    return text
-      .slice(open.length, end)
-      .split("\n")
-      .map((line) => line.replace(GUTTER, ""));
+    return (
+      text
+        .slice(open.length, end)
+        .split("\n")
+        // A rule is checked before the gutter goes: ` * * *` would otherwise lose a star to it.
+        .map((line) => (RULE.test(line.trim()) ? "" : line.replace(GUTTER, "")))
+    );
   }
   return text.split("\n").map((line) => line.replace(LINE_MARKER, ""));
+}
+
+/** Characters separator rules are drawn with, box-drawing ones included. */
+const RULE_CHARACTER = "[-=*#~_+\\u2500-\\u257F]";
+
+/** A separator rule: three or more rule characters, maybe spaced (`-----`, `* * *`, `═══`). */
+const RULE = new RegExp(`^(?:${RULE_CHARACTER}\\s*){3,}$`, "u");
+
+/** Rule runs decorating a heading, like `===== Helpers =====` or `---- Setup`. */
+const DECORATION = new RegExp(`^${RULE_CHARACTER}{4,}\\s+|\\s+${RULE_CHARACTER}{4,}$`, "gu");
+
+/**
+ * Turns separator rules into blank lines, so they neither reach the metrics nor glue a heading to
+ * the text below it, and trims rule runs off decorated headings.
+ */
+function withoutRules(lines: string[]): string[] {
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    return RULE.test(trimmed) ? "" : trimmed.replace(DECORATION, "");
+  });
 }
 
 /** Drops fenced code blocks and doctests (`>>>` lines and their output). */

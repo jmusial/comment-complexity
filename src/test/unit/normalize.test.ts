@@ -15,6 +15,83 @@ describe("normalize", () => {
   );
 });
 
+describe("separator rules", () => {
+  it.each<[string, Dialect, string[], string]>([
+    [
+      "a rule above a heading, which then stands apart from the table below it",
+      "plain",
+      [
+        "// -----------------------------------------------------------------------------",
+        "// Compiler detection",
+        "//",
+        "//  V8_CC_GNU     - GCC, or clang in gcc mode",
+      ],
+      "Compiler detection\nv8 cc gnu - GCC, or clang in gcc mode",
+    ],
+    ["decoration around a heading", "plain", ["// ===== Helpers ====="], "Helpers"],
+    ["decoration before a heading", "plain", ["# ---- Setup"], "Setup"],
+    ["a divider alone", "plain", ["// =========="], ""],
+    [
+      "spaced and box-drawing rules in a block",
+      "plain",
+      ["/*", " * * * *", " * Retries the upload.", " * ═══════════", " */"],
+      "Retries the upload.",
+    ],
+    [
+      "exactly three spaced stars, one of which looks like the gutter",
+      "plain",
+      ["/*", " * Retries the upload.", " * * *", " * Then gives up.", " */"],
+      "Retries the upload.\nThen gives up.",
+    ],
+    [
+      "a run of stars in a block",
+      "plain",
+      ["/*", " ***", " * Retries the upload.", " */"],
+      "Retries the upload.",
+    ],
+    [
+      "a Markdown setext underline",
+      "markdown",
+      ["/// Overview", "/// ========", "///", "/// Retries the upload."],
+      "Overview\nRetries the upload.",
+    ],
+    [
+      "a rule between a description and its tags",
+      "jsdoc",
+      [
+        "/**",
+        " * Retries the upload.",
+        " * --------------------",
+        " * @param url Where to send it.",
+        " */",
+      ],
+      "Retries the upload.\nWhere to send it.",
+    ],
+    [
+      "NumPy section underlines, which still mark sections",
+      "python",
+      [
+        '"""Sum of values.',
+        "",
+        "Parameters",
+        "----------",
+        "values : list",
+        "    The values to add.",
+        '"""',
+      ],
+      "Sum of values.\nThe values to add.",
+    ],
+    [
+      "dashes and equals signs inside prose",
+      "plain",
+      ["// a -- b and c == d"],
+      "a -- b and c == d",
+    ],
+  ])("drops %s", (_, dialect, raw, text) => {
+    expect(normalize(raw.join("\n"), dialect).text).toBe(text);
+  });
+});
+
 describe("dialectFor", () => {
   it.each<[string, CommentKind, Dialect]>([
     ["go", "line", "godoc"],
