@@ -1,5 +1,6 @@
 import { type Node, Parser, type Point, type Tree } from "@vscode/tree-sitter-wasm";
 import type { LanguageSpec } from "./languages";
+import { isStructured } from "./structured";
 
 export type CommentKind = "line" | "block" | "doc";
 
@@ -22,8 +23,8 @@ const CODE_PUNCTUATION = /[;{}()[\]=]/;
 
 /**
  * Collects the comments worth scoring, in document order: consecutive line comments become one,
- * docstrings count as doc comments, and shebangs, license headers, directives and commented-out
- * code are dropped.
+ * docstrings count as doc comments, and shebangs, license headers, directives, commented-out code
+ * and structured data for tools (see `isStructured`) are dropped.
  */
 export function extractComments(tree: Tree, spec: LanguageSpec): Comment[] {
   const groups: Node[][] = [];
@@ -49,7 +50,7 @@ export function extractComments(tree: Tree, spec: LanguageSpec): Comment[] {
       const last = nodes[nodes.length - 1]!;
       const kind = kindOf(first, spec);
       const body = nodes.map((node) => bodyOf(node, spec)).join("\n");
-      if (body === "" || (LICENSE.test(body) && atFileStart(first, spec))) {
+      if (body === "" || (LICENSE.test(body) && atFileStart(first, spec)) || isStructured(body)) {
         continue;
       }
       if (kind !== "doc" && CODE_PUNCTUATION.test(body)) {

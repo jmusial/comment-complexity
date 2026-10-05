@@ -120,6 +120,24 @@ describe("extractComments", () => {
     ]);
   });
 
+  it("skips structured data for tools, like __GDPR__ annotations", async () => {
+    const comments = await extract([
+      "function send(): void {",
+      "  /* __GDPR__",
+      '    "fetcherTelemetry" : {',
+      '      "owner": "chrmarti",',
+      '      "comment": "Telemetry event to test connectivity."',
+      "    }",
+      "  */",
+      "  // Sends the event once the network is back.",
+      "  report();",
+      "}",
+    ]);
+    expect(comments.map(({ rawText }) => rawText)).toEqual([
+      "// Sends the event once the network is back.",
+    ]);
+  });
+
   it("finds the target symbol of each declaration kind", async () => {
     const comments = await extract([
       "/** A. */",

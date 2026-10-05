@@ -1,5 +1,6 @@
 import type { Point } from "@vscode/tree-sitter-wasm";
 import { type Comment, type CommentKind, LICENSE } from "./comments";
+import { isStructured } from "./structured";
 
 export interface BlockSyntax {
   readonly start: string;
@@ -94,7 +95,7 @@ export function scanComments(text: string, syntax: CommentSyntax): Comment[] {
     const last = spans[spans.length - 1]!;
     const raws = spans.map((span) => text.slice(span.start, span.end));
     const body = spans.map((span, i) => bodyOf(raws[i]!, span, syntax)).join("\n");
-    if (body === "" || (LICENSE.test(body) && !first.afterCode)) {
+    if (body === "" || (LICENSE.test(body) && !first.afterCode) || isStructured(body)) {
       continue;
     }
     comments.push({

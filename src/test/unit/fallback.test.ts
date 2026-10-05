@@ -176,6 +176,20 @@ describe("scanComments", () => {
     ]);
   });
 
+  it("skips structured data for tools", () => {
+    const kotlin = FALLBACK_SYNTAXES.get("kotlin")!;
+    const text = [
+      "/* __GDPR__",
+      '  "event" : { "owner": "someone" }',
+      "*/",
+      "// Sends the event once the network is back.",
+      "fun send() {}",
+    ].join("\n");
+    expect(scanComments(text, kotlin).map(({ rawText }) => rawText)).toEqual([
+      "// Sends the event once the network is back.",
+    ]);
+  });
+
   it("ends line comments before a CRLF", () => {
     const comments = scanComments(
       "// a\r\n// b\r\nval x = 1\r\n",
