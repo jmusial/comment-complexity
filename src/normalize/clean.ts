@@ -100,10 +100,13 @@ function withoutMarkers(rawText: string): string[] {
       text.endsWith(close) && text.length - close.length >= open.length
         ? text.length - close.length
         : text.length;
-    return text
-      .slice(open.length, end)
-      .split("\n")
-      .map((line) => line.replace(GUTTER, ""));
+    return (
+      text
+        .slice(open.length, end)
+        .split("\n")
+        // A rule is checked before the gutter goes: ` * * *` would otherwise lose a star to it.
+        .map((line) => (RULE.test(line.trim()) ? "" : line.replace(GUTTER, "")))
+    );
   }
   return text.split("\n").map((line) => line.replace(LINE_MARKER, ""));
 }

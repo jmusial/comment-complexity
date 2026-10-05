@@ -38,6 +38,18 @@ describe("separator rules", () => {
       "Retries the upload.",
     ],
     [
+      "exactly three spaced stars, one of which looks like the gutter",
+      "plain",
+      ["/*", " * Retries the upload.", " * * *", " * Then gives up.", " */"],
+      "Retries the upload.\nThen gives up.",
+    ],
+    [
+      "a run of stars in a block",
+      "plain",
+      ["/*", " ***", " * Retries the upload.", " */"],
+      "Retries the upload.",
+    ],
+    [
       "a Markdown setext underline",
       "markdown",
       ["/// Overview", "/// ========", "///", "/// Retries the upload."],
