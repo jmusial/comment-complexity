@@ -95,6 +95,42 @@ describe("extractComments", () => {
     ]);
   });
 
+  it("skips license headers after an include guard or imports", async () => {
+    const cpp = await extract(
+      [
+        "#ifndef ARROW_VENDORED_DATE_H",
+        "#define ARROW_VENDORED_DATE_H",
+        "",
+        "// The MIT License (MIT)",
+        "//",
+        "// Copyright (c) 2015, 2016, 2017 Howard Hinnant",
+        "",
+        "// Converts between calendar dates and day counts.",
+        "int days(int year);",
+        "",
+        "#endif",
+      ],
+      "cpp",
+    );
+    expect(cpp.map((c) => c.rawText)).toEqual([
+      "// Converts between calendar dates and day counts.",
+    ]);
+
+    const ts = await extract([
+      '"use strict";',
+      'import { add } from "./add";',
+      "/*",
+      ' * Licensed under the Apache License, Version 2.0 (the "License");',
+      " * you may not use this file except in compliance with the License.",
+      " */",
+      "// Copyright notices are added by the release script.",
+      "export const sum = add;",
+    ]);
+    expect(ts.map((c) => c.rawText)).toEqual([
+      "// Copyright notices are added by the release script.",
+    ]);
+  });
+
   it("skips commented-out code but keeps prose and doc examples", async () => {
     const comments = await extract([
       "// const old = compute();",
