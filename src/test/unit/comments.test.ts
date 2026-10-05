@@ -138,6 +138,17 @@ describe("extractComments", () => {
     ]);
   });
 
+  it("keeps prose in the same run of line comments as an annotation", async () => {
+    const comments = await extract([
+      '// __GDPR__COMMON__ "common.tid" : { "purpose": "BusinessInsight" }',
+      "// Sends the event once the network is back.",
+      "report();",
+    ]);
+    expect(comments.map(({ rawText, range }) => [rawText, range.start.row])).toEqual([
+      ["// Sends the event once the network is back.", 1],
+    ]);
+  });
+
   it("finds the target symbol of each declaration kind", async () => {
     const comments = await extract([
       "/** A. */",

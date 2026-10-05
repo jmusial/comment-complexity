@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isStructured } from "../../extract/structured";
+import { isStructured, withoutStructured } from "../../extract/structured";
 
 describe("isStructured", () => {
   it.each([
@@ -28,6 +28,9 @@ describe("isStructured", () => {
       "a JSON example without a marker",
       ["{", '  "name": "comment-complexity",', '  "version": "0.0.1",', '  "private": true', "}"],
     ],
+    ["an array of numbers", ["[", "1,", "2,", "3.5,", "-4e2", "]"]],
+    ["an array of literals", ["[", "true,", "false,", "null", "]"]],
+    ["a heading over two data lines", ["Defaults:", '"timeout": 30,', '"retries": 3']],
     [
       "a list of quoted values",
       ["Allowed values:", '"lens",', '"hover",', '"diagnostics",', '"report"'],
@@ -61,5 +64,51 @@ describe("isStructured", () => {
     ["an empty body", [""]],
   ])("keeps %s", (_, lines) => {
     expect(isStructured(lines.join("\n"))).toBe(false);
+  });
+});
+
+/** Splits line comments, one line each; returns the kept groups as text. */
+const kept = (...lines: string[]) =>
+  withoutStructured(lines, (line) => line).map((group) => group.join(" / "));
+
+describe("withoutStructured", () => {
+  it("keeps prose next to an annotation in the same run", () => {
+    expect(
+      kept(
+        "__GDPR__",
+        '"event" : {',
+        '"owner": "someone"',
+        "}",
+        "Sends the event once the network is back.",
+      ),
+    ).toEqual(["Sends the event once the network is back."]);
+    expect(
+      kept(
+        "Sends the event once the network is back.",
+        '__GDPR__COMMON__ "common.tid" : { "purpose": "BusinessInsight" }',
+        "Then clears the queue.",
+      ),
+    ).toEqual(["Sends the event once the network is back.", "Then clears the queue."]);
+  });
+
+  it("drops an annotation at the end of a run, after an empty line", () => {
+    expect(
+      kept("", "Sends the event once the network is back.", "__GDPR__", '"event": {}'),
+    ).toEqual([" / Sends the event once the network is back."]);
+  });
+
+  it("keeps prose with a short example whole, empty lines included", () => {
+    const lines = ["Reads the config, for example:", '"timeout": 30', "", "and applies it."];
+    expect(kept(...lines)).toEqual([lines.join(" / ")]);
+  });
+
+  it("drops data that is only structured as a whole", () => {
+    expect(kept("Defaults:", '"timeout": 30,', '"retries": 3')).toEqual([]);
+  });
+
+  it("keeps or drops a single comment whole", () => {
+    expect(kept("Retries the upload.")).toEqual(["Retries the upload."]);
+    expect(kept('__GDPR__ "event": {}')).toEqual([]);
+    expect(withoutStructured([], (line: string) => line)).toEqual([]);
   });
 });

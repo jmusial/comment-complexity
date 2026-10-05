@@ -1,6 +1,6 @@
 import { type Node, Parser, type Point, type Tree } from "@vscode/tree-sitter-wasm";
 import type { LanguageSpec } from "./languages";
-import { isStructured } from "./structured";
+import { withoutStructured } from "./structured";
 
 export type CommentKind = "line" | "block" | "doc";
 
@@ -45,12 +45,15 @@ export function extractComments(tree: Tree, spec: LanguageSpec): Comment[] {
   let parser: Parser | undefined;
   try {
     const comments: Comment[] = docstringsOf(tree, spec);
-    for (const nodes of groups) {
+    // Structured data is split out first, so prose in the same run of line comments survives.
+    for (const nodes of groups.flatMap((group) =>
+      withoutStructured(group, (node) => bodyOf(node, spec)),
+    )) {
       const first = nodes[0]!;
       const last = nodes[nodes.length - 1]!;
       const kind = kindOf(first, spec);
       const body = nodes.map((node) => bodyOf(node, spec)).join("\n");
-      if (body === "" || (LICENSE.test(body) && atFileStart(first, spec)) || isStructured(body)) {
+      if (body === "" || (LICENSE.test(body) && atFileStart(first, spec))) {
         continue;
       }
       if (kind !== "doc" && CODE_PUNCTUATION.test(body)) {

@@ -1,6 +1,6 @@
 import type { Point } from "@vscode/tree-sitter-wasm";
 import { type Comment, type CommentKind, LICENSE } from "./comments";
-import { isStructured } from "./structured";
+import { withoutStructured } from "./structured";
 
 export interface BlockSyntax {
   readonly start: string;
@@ -90,12 +90,14 @@ export function scanComments(text: string, syntax: CommentSyntax): Comment[] {
   }
 
   const comments: Comment[] = [];
-  for (const spans of groups) {
+  // Structured data is split out first, so prose in the same run of line comments survives.
+  const spanBody = (span: Span): string => bodyOf(text.slice(span.start, span.end), span, syntax);
+  for (const spans of groups.flatMap((group) => withoutStructured(group, spanBody))) {
     const first = spans[0]!;
     const last = spans[spans.length - 1]!;
     const raws = spans.map((span) => text.slice(span.start, span.end));
     const body = spans.map((span, i) => bodyOf(raws[i]!, span, syntax)).join("\n");
-    if (body === "" || (LICENSE.test(body) && !first.afterCode) || isStructured(body)) {
+    if (body === "" || (LICENSE.test(body) && !first.afterCode)) {
       continue;
     }
     comments.push({
