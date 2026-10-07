@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLicenseText } from "../../extract/comments";
+import { isLicenseText, withoutLicense } from "../../extract/license";
 
 describe("isLicenseText", () => {
   it.each([
@@ -14,6 +14,12 @@ describe("isLicenseText", () => {
     ["a proprietary notice", "Copyright 2020 Acme Inc. All rights reserved."],
     ["a dated notice naming a license", "© 2024 Someone. Released under the BSD-3-Clause license."],
     ["a license named after the word", "Copyright (c) 2024 Someone, license: MIT"],
+    ["a notice wrapped across lines", "Copyright (c) 2024 Acme Inc. All rights\nreserved."],
+    [
+      "a license name wrapped across lines",
+      "Copyright (c) 2024 Someone.\nReleased under the MIT\nLicense.",
+    ],
+    ["wrapped boilerplate", "Permission is hereby\ngranted, free of charge, to any person"],
   ])("recognizes %s", (_, body) => {
     expect(isLicenseText(body)).toBe(true);
   });
@@ -25,5 +31,45 @@ describe("isLicenseText", () => {
     ["an identifier containing a license name", "Copyright (c) is read from MIT_LICENSE_FILE."],
   ])("keeps %s", (_, body) => {
     expect(isLicenseText(body)).toBe(false);
+  });
+});
+
+const MIT = [
+  "Copyright (c) 2024 Someone",
+  "",
+  "Permission is hereby granted, free of charge, to any person obtaining a copy",
+  'of this software and associated documentation files (the "Software"), to deal',
+  "in the Software without restriction, including without limitation the rights",
+  "",
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY.",
+];
+
+/** Line comments, one line each; returns the kept groups as text. */
+const kept = (...lines: string[]) =>
+  withoutLicense(lines, (line) => line).map((group) => group.join(" / "));
+
+describe("withoutLicense", () => {
+  it("keeps an explanation right below a license line", () => {
+    expect(kept("SPDX-License-Identifier: MIT", "Explains the calculation.")).toEqual([
+      "Explains the calculation.",
+    ]);
+  });
+
+  it("cuts a whole multi-paragraph license, keeping prose on either side", () => {
+    expect(kept("Settles the ledger.", ...MIT, "Rounds half to even.")).toEqual([
+      "Settles the ledger.",
+      "Rounds half to even.",
+    ]);
+  });
+
+  it("keeps prose that only uses legal words", () => {
+    const lines = ["The software retries when the network drops.", "Errors are reported once."];
+    expect(kept(...lines)).toEqual([lines.join(" / ")]);
+  });
+
+  it("leaves a single comment to the caller", () => {
+    expect(kept("SPDX-License-Identifier: MIT")).toEqual(["SPDX-License-Identifier: MIT"]);
+    expect(withoutLicense([], (line: string) => line)).toEqual([]);
   });
 });

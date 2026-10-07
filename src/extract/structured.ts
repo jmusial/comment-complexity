@@ -1,3 +1,5 @@
+import { cutParts, linesOf } from "./runs";
+
 /**
  * Comments that hold data for tools rather than prose for people, like VS Code's `__GDPR__`
  * telemetry annotations: scoring them as prose gives them the highest scores in a workspace.
@@ -17,20 +19,11 @@ const ANNOTATION_MARKER = /^__[A-Z][A-Z0-9_]*__(?:$|\s+["{[])/;
 const DATA_LINE =
   /^(?:"[^"]*"\s*:|[[\]{}(),;\s]+$|(?:"[^"]*"|-?\d+(?:\.\d+)?(?:e[+-]?\d+)?|true|false|null)\s*,?\s*$)/i;
 
-/** Leading block-comment gutter and indentation. */
-const GUTTER = /^[\s*]*/;
-
 /** Fewest lines for the data share to mean anything; a one-line example stays prose. */
 const MIN_LINES = 3;
 
 /** Share of lines that must be data. */
 const DATA_SHARE = 0.6;
-
-const linesOf = (body: string): string[] =>
-  body
-    .split("\n")
-    .map((line) => line.replace(GUTTER, "").trim())
-    .filter((line) => line !== "");
 
 const isDataLine = (line: string): boolean => ANNOTATION_MARKER.test(line) || DATA_LINE.test(line);
 
@@ -57,35 +50,8 @@ export function withoutStructured<T>(comments: readonly T[], body: (comment: T) 
   if (comments.length === 1) {
     return isStructured(body(comments[0]!)) ? [] : [[...comments]];
   }
-  // Consecutive comments that are all data, or all prose.
-  const runs: T[][] = [];
-  let data: boolean | undefined;
-  for (const comment of comments) {
-    const lines = linesOf(body(comment));
-    // An empty line comment belongs to the run it sits in.
-    const isData = lines.length === 0 ? (data ?? false) : lines.every(isDataLine);
-    if (isData === data) {
-      runs.at(-1)!.push(comment);
-    } else {
-      runs.push([comment]);
-      data = isData;
-    }
-  }
-  const text = (run: readonly T[]): string => run.map(body).join("\n");
-  const segments: T[][] = [];
-  let current: T[] = [];
-  for (const run of runs) {
-    if (isStructured(text(run))) {
-      if (current.length > 0) {
-        segments.push(current);
-      }
-      current = [];
-    } else {
-      current.push(...run);
-    }
-  }
-  if (current.length > 0) {
-    segments.push(current);
-  }
-  return segments.filter((segment) => !isStructured(text(segment)));
+  const text = (group: readonly T[]): string => group.map(body).join("\n");
+  return cutParts(comments, body, isDataLine, isStructured).filter(
+    (segment) => !isStructured(text(segment)),
+  );
 }

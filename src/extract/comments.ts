@@ -1,5 +1,6 @@
 import { type Node, Parser, type Point, type Tree } from "@vscode/tree-sitter-wasm";
 import type { LanguageSpec } from "./languages";
+import { LICENSE, isLicenseText, withoutLicense } from "./license";
 import { withoutStructured } from "./structured";
 
 export type CommentKind = "line" | "block" | "doc";
@@ -14,29 +15,6 @@ export interface Comment {
   readonly targetSymbolName: string | undefined;
   /** Found by the regex fallback: no syntax tree, so no target symbol or commented-out code check. */
   readonly approx: boolean;
-}
-
-/** Words a license header has; enough to drop the file's first comment. */
-export const LICENSE = /\b(?:copyright|licen[cs]ed?|spdx-license-identifier)\b|\(c\)|©/i;
-
-/** Wording only license texts use. */
-const LEGAL_BOILERPLATE =
-  /\bspdx-license-identifier\b|\bpermission is hereby granted\b|\bwithout warranties or conditions\b|\bprovided\s+["“]?as is["”]?|\blicensed under the\b/i;
-
-/** A copyright notice: `Copyright (c)`, `Copyright 2024`, `© 2024`. */
-const COPYRIGHT_NOTICE = /\bcopyright\s*(?:\(c\)|©|\d{4})|©\s*\d{4}/i;
-
-/** A license by name, or the proprietary "all rights reserved". */
-const LICENSE_NAME =
-  /\b(?:MIT|Apache|BSD|GNU|L?GPL|AGPL|MPL|Mozilla Public|ISC|Unlicense|Creative Commons|Eclipse Public)\b.{0,40}\blicen[cs]e\b|\blicen[cs]e\b.{0,20}\b(?:MIT|Apache|BSD|L?GPL|AGPL|MPL|ISC)\b|\ball rights reserved\b/i;
-
-/**
- * Whether a comment is unmistakably license text, wherever it sits: after an include guard,
- * `#pragma once` or `"use strict"`, or above vendored code. Prose that only mentions a license
- * ("this file is licensed oddly") is not.
- */
-export function isLicenseText(body: string): boolean {
-  return LEGAL_BOILERPLATE.test(body) || (COPYRIGHT_NOTICE.test(body) && LICENSE_NAME.test(body));
 }
 
 /** Commented-out code nearly always has one of these; prose that happens to parse (`TODO`, `a - b`) does not. */
@@ -66,9 +44,11 @@ export function extractComments(tree: Tree, spec: LanguageSpec): Comment[] {
   let parser: Parser | undefined;
   try {
     const comments: Comment[] = docstringsOf(tree, spec);
-    // Structured data is split out first, so prose in the same run of line comments survives.
+    // Structured data and license text are cut out first, so prose in the same run survives.
     for (const nodes of groups.flatMap((group) =>
-      withoutStructured(group, (node) => bodyOf(node, spec)),
+      withoutStructured(group, (node) => bodyOf(node, spec)).flatMap((part) =>
+        withoutLicense(part, (node) => bodyOf(node, spec)),
+      ),
     )) {
       const first = nodes[0]!;
       const last = nodes[nodes.length - 1]!;

@@ -131,6 +131,18 @@ describe("extractComments", () => {
     ]);
   });
 
+  it("keeps prose in the same run of line comments as a license notice", async () => {
+    const comments = await extract([
+      "export const rate = 0.2;",
+      "// SPDX-License-Identifier: MIT",
+      "// Explains the calculation: the rate is applied after discounts.",
+      "export const total = 1;",
+    ]);
+    expect(comments.map(({ rawText, range }) => [rawText, range.start.row])).toEqual([
+      ["// Explains the calculation: the rate is applied after discounts.", 2],
+    ]);
+  });
+
   it("skips commented-out code but keeps prose and doc examples", async () => {
     const comments = await extract([
       "// const old = compute();",
