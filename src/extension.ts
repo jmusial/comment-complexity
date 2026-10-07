@@ -28,6 +28,9 @@ function key(document: vscode.TextDocument): string {
   return document.uri.toString();
 }
 
+/** `workspaceState` key of the vocabulary saved for the next session. */
+export const SAVED_VOCABULARY = "commentComplexity.vocabulary";
+
 /** How long typing must pause before diagnostics are recomputed. */
 export const DIAGNOSTICS_DELAY_MS = 300;
 
@@ -71,7 +74,8 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   const analyzer = new CommentAnalyzer({
     tree: (documentKey) => trees.get(documentKey),
     hasGrammar: (languageId) => loader.supports(languageId),
-    vocabulary: () => vocabulary.words(),
+    // Scoring never waits for the workspace scan; it rescores once the scan is done (below).
+    vocabulary: async () => vocabulary.current(),
     zipf: () => loadZipf(vscode.Uri.joinPath(context.extensionUri, "data", "zipf-en.json").fsPath),
     settings: current,
   });
@@ -84,6 +88,15 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
       .catch((error: unknown) => log.error(`Failed to score ${key(document)}`, error));
   };
   const typing = new Debouncer(DIAGNOSTICS_DELAY_MS);
+
+  // Until this session's scan is done, score with the vocabulary saved by the last one.
+  vocabulary.restore(context.workspaceState.get<string[]>(SAVED_VOCABULARY) ?? []);
+  const rescore = vocabulary.onDidBuild((words) => {
+    void context.workspaceState.update(SAVED_VOCABULARY, [...words]);
+    analyzer.clear();
+    lenses.refresh();
+    vscode.workspace.textDocuments.forEach(diagnose);
+  });
   const selector = [...LANGUAGES.keys(), ...FALLBACK_SYNTAXES.keys()].map((language) => ({
     language,
   }));
@@ -103,6 +116,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     lenses,
     collection,
     typing,
+    rescore,
     ...registerCommands(
       { analyzer, parsed: (documentKey) => trees.whenParsed(documentKey) },
       lenses,
