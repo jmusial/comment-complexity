@@ -184,6 +184,60 @@ describe("WorkspaceVocabulary", () => {
     vocabulary.dispose();
   });
 
+  describe("without waiting", () => {
+    it("gives the restored words until the build is done, then the built ones", async () => {
+      const { workspace, vocabulary } = setup();
+      workspace.files.set("/ws/a.ts", "const invoiceTotal = 0;");
+      let release: (() => void) | undefined;
+      workspace.gates.set("/ws/a.ts", new Promise<void>((resolve) => (release = resolve)));
+      vocabulary.restore(["ledger"]);
+      const built = vi.fn<(words: ReadonlySet<string>) => void>();
+      vocabulary.onDidBuild(built);
+
+      const before = vocabulary.current();
+      expect([...before]).toEqual(["ledger"]);
+      // The build started; the same set is given while files are read.
+      await vi.waitFor(() => expect(workspace.reads).toEqual(["/ws/a.ts"]));
+      expect(vocabulary.current()).toBe(before);
+      expect(built).not.toHaveBeenCalled();
+
+      release!();
+      await vi.waitFor(() => expect(built).toHaveBeenCalledTimes(1));
+      const words = vocabulary.current();
+      expect([...words].toSorted()).toEqual(["invoice", "total"]);
+      expect(built).toHaveBeenCalledWith(words);
+      expect(workspace.findFiles).toHaveBeenCalledTimes(1);
+      vocabulary.dispose();
+    });
+
+    it("gives nothing before the build without restored words", () => {
+      const { vocabulary } = setup();
+      expect([...vocabulary.current()]).toEqual([]);
+      vocabulary.dispose();
+    });
+
+    it("reports a failed build, keeps the restored words and tries again on the next request", async () => {
+      const { workspace, errors, vocabulary } = setup();
+      workspace.files.set("/ws/a.ts", "const invoiceTotal = 0;");
+      workspace.findFiles.mockRejectedValueOnce(new Error("search failed"));
+      vocabulary.restore(["ledger"]);
+      const built = vi.fn<(words: ReadonlySet<string>) => void>();
+      const listening = vocabulary.onDidBuild(built);
+
+      expect([...vocabulary.current()]).toEqual(["ledger"]);
+      await vi.waitFor(() => expect(errors).toHaveLength(1));
+      expect(errors[0]).toEqual(["workspace", new Error("search failed")]);
+      expect([...vocabulary.current()]).toEqual(["ledger"]);
+      await vi.waitFor(() => expect(built).toHaveBeenCalledTimes(1));
+      expect(workspace.findFiles).toHaveBeenCalledTimes(2);
+
+      // A disposed listener hears no more builds.
+      listening.dispose();
+      expect(built).toHaveBeenCalledTimes(1);
+      vocabulary.dispose();
+    });
+  });
+
   describe("on save", () => {
     it("waits for the first build, then applies the scan rules", async () => {
       const { workspace, vocabulary } = setup();

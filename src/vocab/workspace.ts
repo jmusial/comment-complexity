@@ -114,6 +114,10 @@ export class WorkspaceVocabulary<U extends FileUri> implements Disposable {
   private readonly parsers = new Map<string, Promise<Parser | undefined>>();
   private readonly listeners: Disposable[];
   private building: Promise<void> | undefined;
+  private built = false;
+  /** What `current` gives until the build is done: nothing, or a vocabulary restored from before. */
+  private initial: ReadonlySet<string> = new Set();
+  private readonly buildListeners = new Set<(words: ReadonlySet<string>) => void>();
 
   constructor(
     private readonly host: WorkspaceHost<U>,
@@ -146,9 +150,34 @@ export class WorkspaceVocabulary<U extends FileUri> implements Disposable {
 
   /** Lower-cased identifier words. The first call builds the vocabulary; later ones share it. */
   async words(): Promise<ReadonlySet<string>> {
-    this.building ??= this.build();
+    this.building ??= this.startBuild();
     await this.building;
     return this.vocabulary.words();
+  }
+
+  /**
+   * The words available now, without waiting: the built vocabulary, or until it is built the one
+   * from `restore` (empty by default). Starts the build in the background; `onDidBuild` tells when
+   * it is done. The set stays the same object until the build ends, so results cached against it
+   * stay valid while files are read.
+   */
+  current(): ReadonlySet<string> {
+    if (this.building === undefined) {
+      this.building = this.startBuild();
+      this.building.catch((error: unknown) => this.onError("workspace", error));
+    }
+    return this.built ? this.vocabulary.words() : this.initial;
+  }
+
+  /** Words to use until the first build is done, such as the vocabulary saved last session. */
+  restore(words: Iterable<string>): void {
+    this.initial = new Set(words);
+  }
+
+  /** Calls `listener` with the words each time a build finishes. */
+  onDidBuild(listener: (words: ReadonlySet<string>) => void): Disposable {
+    this.buildListeners.add(listener);
+    return { dispose: () => this.buildListeners.delete(listener) };
   }
 
   dispose(): void {
@@ -161,8 +190,19 @@ export class WorkspaceVocabulary<U extends FileUri> implements Disposable {
     this.parsers.clear();
   }
 
-  private build(): Promise<void> {
-    return this.scan(INCLUDE);
+  /** Builds the vocabulary; a failed build is forgotten, so the next request tries again. */
+  private async startBuild(): Promise<void> {
+    try {
+      await this.scan(INCLUDE);
+    } catch (error) {
+      this.building = undefined;
+      throw error;
+    }
+    this.built = true;
+    const words = this.vocabulary.words();
+    for (const listener of this.buildListeners) {
+      listener(words);
+    }
   }
 
   /** Reads every file `include` finds; `update` applies the scan rules and the file limit. */

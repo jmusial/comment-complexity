@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DIAGNOSTICS_DELAY_MS, activate, deactivate } from "../../extension";
+import { DIAGNOSTICS_DELAY_MS, SAVED_VOCABULARY, activate, deactivate } from "../../extension";
 import { EXCLUDE, INCLUDE } from "../../vocab/workspace";
 // The same module `extension.ts` gets as `vscode` (see vitest.config.mts).
 import * as vscode from "./vscode.stub";
@@ -13,8 +13,20 @@ const uri = (filePath: string) => ({ path: filePath, toString: () => `file://${f
 const subscriptions: { dispose(): unknown }[] = [];
 
 /** Activates against the stub. Its grammars are missing, so every parse fails and is logged. */
+/** `ExtensionContext.workspaceState`, kept across a test's activations. */
+const workspaceState = new Map<string, unknown>();
+
 function start() {
-  const context = { subscriptions, extensionUri: { fsPath: "/no/such/extension" } };
+  const context = {
+    subscriptions,
+    extensionUri: { fsPath: "/no/such/extension" },
+    workspaceState: {
+      get: (key: string) => workspaceState.get(key),
+      update: async (key: string, value: unknown) => {
+        workspaceState.set(key, value);
+      },
+    },
+  };
   return activate(context as never);
 }
 
@@ -27,6 +39,7 @@ afterEach(() => {
     delete vscode.configuration[setting];
   }
   vscode.workspace.textDocuments.length = 0;
+  workspaceState.clear();
   vscode.window.activeTextEditor = undefined;
 });
 
@@ -153,15 +166,17 @@ describe("activate", () => {
   });
 
   it("applies settings live", async () => {
-    const { settings } = start();
+    const { settings, vocabulary } = start();
     const lensProvider = vscode.languages.registerCodeLensProvider.mock
       .calls[0]![1] as ComplexityLensProvider;
     const hoverProvider = vscode.languages.registerHoverProvider.mock
       .calls[0]![1] as ComplexityHoverProvider;
-    const refreshed = vi.fn<() => void>();
-    lensProvider.onDidChangeCodeLenses(refreshed);
     const document = kotlin() as never;
     expect(await lensProvider.provideCodeLenses(document)).toHaveLength(1);
+    // The first lens started the vocabulary build; its refresh is not what this test is about.
+    await vocabulary.words();
+    const refreshed = vi.fn<() => void>();
+    lensProvider.onDidChangeCodeLenses(refreshed);
 
     // Other extensions' settings change nothing.
     configure({ "commentComplexity.threshold": 10 }, "editor");
@@ -341,6 +356,44 @@ describe("activate", () => {
       expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(message);
       expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
     });
+  });
+
+  it("scores before the vocabulary is built, then rescores and saves it", async () => {
+    // Saved by the last session: a known word is neither rare nor an undefined acronym.
+    workspaceState.set(SAVED_VOCABULARY, ["sqs"]);
+    let finishScan: ((uris: never[]) => void) | undefined;
+    vscode.workspace.findFiles.mockImplementationOnce(
+      () => new Promise((resolve) => (finishScan = resolve)),
+    );
+    const { analyzer, vocabulary } = start();
+    const lensProvider = vscode.languages.registerCodeLensProvider.mock
+      .calls[0]![1] as ComplexityLensProvider;
+    const refreshed = vi.fn<() => void>();
+    lensProvider.onDidChangeCodeLenses(refreshed);
+    const clear = vi.spyOn(analyzer, "clear");
+    configure({ "commentComplexity.diagnostics": true, "commentComplexity.threshold": 0 });
+    const document = {
+      ...kotlin(),
+      getText: () => "// Retries SQS calls when the network drops.\nval x = 1",
+    };
+    vscode.workspace.textDocuments.push(document);
+    clear.mockClear();
+    refreshed.mockClear();
+
+    // The scan is still running, yet the lens is there, scored with the saved words.
+    const [lens] = await lensProvider.provideCodeLenses(document as never);
+    expect(lens!.command!.title).not.toContain("acronyms");
+    expect([...vocabulary.current()]).toEqual(["sqs"]);
+    expect(refreshed).not.toHaveBeenCalled();
+
+    finishScan!([]);
+    await vi.waitFor(() => expect(refreshed).toHaveBeenCalledTimes(1));
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(workspaceState.get(SAVED_VOCABULARY)).toEqual([]);
+    await vi.waitFor(() => expect(vscode.diagnostics.get("file:///ws/a.kt")).toHaveLength(1));
+    // Now built from an empty workspace, SQS is unknown again.
+    const [rescored] = await lensProvider.provideCodeLenses(document as never);
+    expect(rescored!.command!.title).toContain("acronyms: SQS");
   });
 
   it("stops listening when its subscriptions are disposed", () => {
