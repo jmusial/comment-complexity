@@ -1,5 +1,6 @@
 import { type Node, Parser, type Point, type Tree } from "@vscode/tree-sitter-wasm";
 import type { LanguageSpec } from "./languages";
+import { LICENSE, isLicenseText, withoutLicense } from "./license";
 import { withoutStructured } from "./structured";
 
 export type CommentKind = "line" | "block" | "doc";
@@ -15,8 +16,6 @@ export interface Comment {
   /** Found by the regex fallback: no syntax tree, so no target symbol or commented-out code check. */
   readonly approx: boolean;
 }
-
-export const LICENSE = /\b(?:copyright|licen[cs]ed?|spdx-license-identifier)\b|\(c\)|©/i;
 
 /** Commented-out code nearly always has one of these; prose that happens to parse (`TODO`, `a - b`) does not. */
 const CODE_PUNCTUATION = /[;{}()[\]=]/;
@@ -45,15 +44,17 @@ export function extractComments(tree: Tree, spec: LanguageSpec): Comment[] {
   let parser: Parser | undefined;
   try {
     const comments: Comment[] = docstringsOf(tree, spec);
-    // Structured data is split out first, so prose in the same run of line comments survives.
+    // Structured data and license text are cut out first, so prose in the same run survives.
     for (const nodes of groups.flatMap((group) =>
-      withoutStructured(group, (node) => bodyOf(node, spec)),
+      withoutStructured(group, (node) => bodyOf(node, spec)).flatMap((part) =>
+        withoutLicense(part, (node) => bodyOf(node, spec)),
+      ),
     )) {
       const first = nodes[0]!;
       const last = nodes[nodes.length - 1]!;
       const kind = kindOf(first, spec);
       const body = nodes.map((node) => bodyOf(node, spec)).join("\n");
-      if (body === "" || (LICENSE.test(body) && atFileStart(first, spec))) {
+      if (body === "" || (LICENSE.test(body) && atFileStart(first, spec)) || isLicenseText(body)) {
         continue;
       }
       if (kind !== "doc" && CODE_PUNCTUATION.test(body)) {

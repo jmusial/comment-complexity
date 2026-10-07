@@ -95,6 +95,120 @@ describe("extractComments", () => {
     ]);
   });
 
+  it("skips license headers after an include guard or imports", async () => {
+    const cpp = await extract(
+      [
+        "#ifndef ARROW_VENDORED_DATE_H",
+        "#define ARROW_VENDORED_DATE_H",
+        "",
+        "// The MIT License (MIT)",
+        "//",
+        "// Copyright (c) 2015, 2016, 2017 Howard Hinnant",
+        "",
+        "// Converts between calendar dates and day counts.",
+        "int days(int year);",
+        "",
+        "#endif",
+      ],
+      "cpp",
+    );
+    expect(cpp.map((c) => c.rawText)).toEqual([
+      "// Converts between calendar dates and day counts.",
+    ]);
+
+    const ts = await extract([
+      '"use strict";',
+      'import { add } from "./add";',
+      "/*",
+      ' * Licensed under the Apache License, Version 2.0 (the "License");',
+      " * you may not use this file except in compliance with the License.",
+      " */",
+      "// Copyright notices are added by the release script.",
+      "export const sum = add;",
+    ]);
+    expect(ts.map((c) => c.rawText)).toEqual([
+      "// Copyright notices are added by the release script.",
+    ]);
+  });
+
+  it("keeps prose in the same run of line comments as a license notice", async () => {
+    const comments = await extract([
+      "export const rate = 0.2;",
+      "// SPDX-License-Identifier: MIT",
+      "// Explains the calculation: the rate is applied after discounts.",
+      "export const total = 1;",
+    ]);
+    expect(comments.map(({ rawText, range }) => [rawText, range.start.row])).toEqual([
+      ["// Explains the calculation: the rate is applied after discounts.", 2],
+    ]);
+  });
+
+  it("cuts a whole MIT header after an include guard, keeping the prose after it", async () => {
+    // The start of arrow's cpp/src/arrow/vendored/datetime/date.h (apache-arrow-25.0.1).
+    const comments = await extract(
+      [
+        "#ifndef ARROW_VENDORED_DATE_H",
+        "#define ARROW_VENDORED_DATE_H",
+        "",
+        "// The MIT License (MIT)",
+        "//",
+        "// Copyright (c) 2015, 2016, 2017 Howard Hinnant",
+        "// Copyright (c) 2016 Adrian Colomitchi",
+        "// Copyright (c) 2017 Florian Dang",
+        "// Copyright (c) 2017 Paul Thompson",
+        "// Copyright (c) 2018, 2019 Tomasz Kamiński",
+        "// Copyright (c) 2019 Jiangang Zhuang",
+        "//",
+        "// Permission is hereby granted, free of charge, to any person obtaining a copy",
+        '// of this software and associated documentation files (the "Software"), to deal',
+        "// in the Software without restriction, including without limitation the rights",
+        "// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+        "// copies of the Software, and to permit persons to whom the Software is",
+        "// furnished to do so, subject to the following conditions:",
+        "//",
+        "// The above copyright notice and this permission notice shall be included in all",
+        "// copies or substantial portions of the Software.",
+        "//",
+        '// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+        "// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,",
+        "// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE",
+        "// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER",
+        "// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,",
+        "// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE",
+        "// SOFTWARE.",
+        "//",
+        "// Our apologies.  When the previous paragraph was written, lowercase had not yet",
+        "// been invented (that would involve another several millennia of evolution).",
+        "// We did not mean to shout.",
+        "",
+        "int days(int year);",
+        "",
+        "#endif",
+      ],
+      "cpp",
+    );
+    expect(comments.map(({ rawText, range }) => [rawText, range.start.row])).toEqual([
+      [
+        [
+          "// Our apologies.  When the previous paragraph was written, lowercase had not yet",
+          "// been invented (that would involve another several millennia of evolution).",
+          "// We did not mean to shout.",
+        ].join("\n"),
+        30,
+      ],
+    ]);
+  });
+
+  it("keeps prose that shares words with a license next to a notice", async () => {
+    const comments = await extract([
+      "export const rate = 0.2;",
+      "// SPDX-License-Identifier: MIT",
+      "// This software parses dates.",
+      "export const total = 1;",
+    ]);
+    expect(comments.map(({ rawText }) => rawText)).toEqual(["// This software parses dates."]);
+  });
+
   it("skips commented-out code but keeps prose and doc examples", async () => {
     const comments = await extract([
       "// const old = compute();",

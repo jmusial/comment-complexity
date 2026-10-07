@@ -203,6 +203,34 @@ describe("scanComments", () => {
     ]);
   });
 
+  it("skips license text after code", () => {
+    const kotlin = FALLBACK_SYNTAXES.get("kotlin")!;
+    const text = [
+      "package billing",
+      "",
+      "// SPDX-License-Identifier: Apache-2.0",
+      "",
+      "// Settles the ledger once a day.",
+      "fun settle() {}",
+    ].join("\n");
+    expect(scanComments(text, kotlin).map(({ rawText }) => rawText)).toEqual([
+      "// Settles the ledger once a day.",
+    ]);
+  });
+
+  it("keeps prose in the same run of line comments as a license notice", () => {
+    const kotlin = FALLBACK_SYNTAXES.get("kotlin")!;
+    const text = [
+      "package billing",
+      "// Copyright 2024 Acme Inc. All rights reserved.",
+      "// Settles the ledger once a day.",
+      "fun settle() {}",
+    ].join("\n");
+    expect(scanComments(text, kotlin).map(({ rawText }) => rawText)).toEqual([
+      "// Settles the ledger once a day.",
+    ]);
+  });
+
   it("ends line comments before a CRLF", () => {
     const comments = scanComments(
       "// a\r\n// b\r\nval x = 1\r\n",
