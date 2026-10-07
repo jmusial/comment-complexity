@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLicenseText, withoutLicense } from "../../extract/license";
+import { isLicenseLine, isLicenseText, withoutLicense } from "../../extract/license";
 
 describe("isLicenseText", () => {
   it.each([
@@ -71,5 +71,30 @@ describe("withoutLicense", () => {
   it("leaves a single comment to the caller", () => {
     expect(kept("SPDX-License-Identifier: MIT")).toEqual(["SPDX-License-Identifier: MIT"]);
     expect(withoutLicense([], (line: string) => line)).toEqual([]);
+  });
+});
+
+describe("isLicenseLine", () => {
+  it.each([
+    "The MIT License (MIT)",
+    "Copyright (c) 2018, 2019 Tomasz Kamiński",
+    "SPDX-License-Identifier: Apache-2.0",
+    "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE",
+    "copies of the Software, and to permit persons to whom the Software is",
+    "SOFTWARE.",
+    "Neither the name of Google Inc. nor the names of its contributors may be used",
+    "you may not use this file except in compliance with the License.",
+  ])("recognizes %s", (line) => {
+    expect(isLicenseLine(line)).toBe(true);
+  });
+
+  it.each([
+    "This software parses dates.",
+    "Parses dates.",
+    "Our apologies.  When the previous paragraph was written, lowercase had not yet",
+    "Returns a copy of the software update queue.",
+    "",
+  ])("rejects %j", (line) => {
+    expect(isLicenseLine(line)).toBe(false);
   });
 });

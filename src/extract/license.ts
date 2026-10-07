@@ -1,3 +1,4 @@
+import { LICENSE_TEXTS } from "./licenseTexts";
 import { cutParts } from "./runs";
 
 /** Words a license header has; enough to drop the file's first comment. */
@@ -23,9 +24,58 @@ export function isLicenseText(body: string): boolean {
   return LEGAL_BOILERPLATE.test(body) || (COPYRIGHT_NOTICE.test(body) && LICENSE_NAME.test(body));
 }
 
-/** Vocabulary of the lines of a license text, from the notice to the warranty disclaimer. */
-const LEGAL_LINE =
-  /\b(?:copyright|licen[cs]|sublicen[cs]|spdx|warrant|liabilit|liable|permission|permit|redistribut|merchantab|infring|rights|reserved|software|notice|provided|conditions|damages|authors?|holders?|contributors?|compliance|governing|limitations?|express|implied)|©|\(c\)/i;
+const wordsOf = (text: string): string[] => text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+const trigrams = (words: readonly string[]): string[] =>
+  words.slice(2).map((word, i) => `${words[i]} ${words[i + 1]} ${word}`);
+
+/** Words and word trigrams of the standard license texts, built on first use. */
+let corpus:
+  | { readonly words: ReadonlySet<string>; readonly trigrams: ReadonlySet<string> }
+  | undefined;
+
+function licenseCorpus(): NonNullable<typeof corpus> {
+  if (corpus === undefined) {
+    const words = LICENSE_TEXTS.map(wordsOf);
+    corpus = { words: new Set(words.flat()), trigrams: new Set(words.flatMap(trigrams)) };
+  }
+  return corpus;
+}
+
+/** Share of a line's word trigrams found in the license texts from which it is one of theirs. */
+const LICENSE_LINE_SHARE = 0.6;
+
+/** Consecutive trigrams (six words) of license wording that make a line one of theirs anyway. */
+const LICENSE_LINE_RUN = 4;
+
+/**
+ * Whether a line belongs to a license notice: a copyright or SPDX line, a license name, or wording
+ * taken from a standard license text: mostly, or six words verbatim (allowing for a substituted
+ * name, as in "Neither the name of Google Inc. nor the names of its contributors"). Prose that
+ * shares a few words ("Returns a copy of the software update queue") is not.
+ */
+export function isLicenseLine(line: string): boolean {
+  if (COPYRIGHT_NOTICE.test(line) || LEGAL_BOILERPLATE.test(line) || LICENSE_NAME.test(line)) {
+    return true;
+  }
+  const words = wordsOf(line);
+  const { words: known, trigrams: knownTrigrams } = licenseCorpus();
+  if (words.length < 3) {
+    // Too short for trigrams: the tail of a wrapped sentence, like "SOFTWARE." or "the License.".
+    return words.length > 0 && words.every((word) => known.has(word));
+  }
+  let found = 0;
+  let run = 0;
+  let longestRun = 0;
+  const lineTrigrams = trigrams(words);
+  for (const trigram of lineTrigrams) {
+    run = knownTrigrams.has(trigram) ? run + 1 : 0;
+    found += run > 0 ? 1 : 0;
+    longestRun = Math.max(longestRun, run);
+  }
+  // A long verbatim stretch survives a substituted name; a share alone would miss it.
+  return found / lineTrigrams.length >= LICENSE_LINE_SHARE || longestRun >= LICENSE_LINE_RUN;
+}
 
 /**
  * Cuts license text out of a run of line comments, so an explanation right below a notice
@@ -35,5 +85,5 @@ export function withoutLicense<T>(comments: readonly T[], body: (comment: T) => 
   if (comments.length <= 1) {
     return comments.length === 0 ? [] : [[...comments]];
   }
-  return cutParts(comments, body, (line) => LEGAL_LINE.test(line), isLicenseText);
+  return cutParts(comments, body, isLicenseLine, isLicenseText);
 }
